@@ -604,7 +604,8 @@ static void build_header(lv_obj_t* scr) {
         lv_obj_align(dState, LV_ALIGN_TOP_LEFT, 0, 8);
         lv_obj_align(dNet, LV_ALIGN_TOP_RIGHT, 0, 14);
         lv_obj_set_width(dHost, L.W - 24);
-        lv_obj_align(dHost, LV_ALIGN_TOP_LEFT, 0, 54);
+        lv_obj_set_style_text_align(dHost, LV_TEXT_ALIGN_RIGHT, 0);  // both IPs right-aligned
+        lv_obj_align(dHost, LV_ALIGN_TOP_RIGHT, 0, 54);
     }
 }
 
