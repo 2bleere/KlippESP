@@ -168,12 +168,19 @@ void ui_ota_progress(int pct) {
     lv_obj_set_style_border_width(ov, 0, 0);
     lv_obj_set_style_radius(ov, 0, 0);
     lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
+    // wrap within the screen width so the text also fits in portrait (480 px)
+    lv_coord_t tw = lv_disp_get_hor_res(nullptr) - 48;
     lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_32, COL_TEXT);
-    lv_obj_align(t, LV_ALIGN_CENTER, 0, -40);
-    lv_obj_t* s = ui_label(ov, "The screen turns off during the update and comes back\n"
-                               "when the display restarts. Do not unplug.", &lv_font_montserrat_20, COL_DIM);
+    lv_label_set_long_mode(t, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(t, tw);
+    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(t, LV_ALIGN_CENTER, 0, -50);
+    lv_obj_t* s = ui_label(ov, "The screen turns off during the update and comes back when the display restarts. "
+                               "Do not unplug.", &lv_font_montserrat_20, COL_DIM);
+    lv_label_set_long_mode(s, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(s, LV_MIN(tw, 560));
     lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(s, LV_ALIGN_CENTER, 0, 24);
+    lv_obj_align_to(s, t, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
     lv_refr_now(nullptr);
     delay(4000);  // readable pause; no flash has been written yet
     board_backlight(false);
