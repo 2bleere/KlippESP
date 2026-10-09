@@ -180,6 +180,7 @@ void ui_ota_progress(int pct) {
     lv_label_set_long_mode(s, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(s, LV_MIN(tw, 560));
     lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_update_layout(ov);  // wrapped label heights are needed before stacking the subtitle
     lv_obj_align_to(s, t, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
     lv_refr_now(nullptr);
     delay(4000);  // readable pause; no flash has been written yet
