@@ -10,6 +10,8 @@
 
 - Build / flash over USB: `pio run -e wt32_sc01 -t upload`
 - Over the air: set `upload_port` in `[env:wt32_sc01_ota]`, then `pio run -e wt32_sc01_ota -t upload`
+  (tested and working). **Known issue:** the browser/HTTP upload on the settings page (`/update`) does not work on this
+  board yet — the incoming data stalls after ~27 KB (it works on the Waveshare build). Use PlatformIO OTA or USB.
 - Display + touch driver: LovyanGFX (SPI sclk 14, mosi 13, dc 21, cs 15, rst 22; backlight PWM 23; touch I2C sda 18, scl 19, int 39, addr 0x38)
 - Every screen has a landscape (480×320) and a portrait (320×480) layout; choose the orientation (incl. 180° flips) on the
   display (Settings → System → Orientation) or the web settings page; the display restarts to apply it
