@@ -182,38 +182,8 @@ def sim_loop(speed):
 
 # ----------------------------------------------------------------------------- thumbnail
 
-def make_png(w=200, h=200):
-    """A shaded isometric calibration cube on transparent background."""
-    rows = []
-    cx, cy, s = w / 2, h / 2 + 10, w * 0.32
-    top = [(cx, cy - s), (cx + s * 0.87, cy - s / 2), (cx, cy), (cx - s * 0.87, cy - s / 2)]
-    left = [(cx - s * 0.87, cy - s / 2), (cx, cy), (cx, cy + s), (cx - s * 0.87, cy + s / 2)]
-    right = [(cx, cy), (cx + s * 0.87, cy - s / 2), (cx + s * 0.87, cy + s / 2), (cx, cy + s)]
-
-    def inside(px, py, poly):
-        c = False
-        for i in range(len(poly)):
-            (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % len(poly)]
-            if (y1 > py) != (y2 > py) and px < (x2 - x1) * (py - y1) / (y2 - y1) + x1:
-                c = not c
-        return c
-
-    for y in range(h):
-        row = bytearray(b"\x00")
-        for x in range(w):
-            if inside(x, y, top):
-                px = (90, 200, 120, 255)
-            elif inside(x, y, left):
-                px = (40, 140, 75, 255)
-            elif inside(x, y, right):
-                px = (55, 170, 95, 255)
-            else:
-                px = (0, 0, 0, 0)
-            if px[3] and (y % 8 == 0):  # layer lines
-                px = tuple(int(c * 0.85) for c in px[:3]) + (255,)
-            row += bytes(px)
-        rows.append(bytes(row))
-    raw = zlib.compress(b"".join(rows), 9)
+def encode_png(w, h, rgba_rows):
+    raw = zlib.compress(b"".join(b"\x00" + bytes(r) for r in rgba_rows), 9)
 
     def chunk(t, d):
         c = struct.pack(">I", len(d)) + t + d
@@ -223,7 +193,80 @@ def make_png(w=200, h=200):
             + chunk(b"IDAT", raw) + chunk(b"IEND", b""))
 
 
-THUMB = make_png()
+def inside_poly(px, py, poly):
+    c = False
+    for i in range(len(poly)):
+        (x1, y1), (x2, y2) = poly[i], poly[(i + 1) % len(poly)]
+        if (y1 > py) != (y2 > py) and px < (x2 - x1) * (py - y1) / (y2 - y1) + x1:
+            c = not c
+    return c
+
+
+def render(shapes, w=200, h=200):
+    """Paint shapes in order (later ones on top) on a transparent canvas, with faint layer lines.
+    shape: ("poly", [(x, y), ...], rgb) | ("circle", cx, cy, r, rgb) | ("rect", x0, y0, x1, y1, rgb)"""
+    rows = []
+    for y in range(h):
+        row = bytearray()
+        for x in range(w):
+            col = None
+            for sh in shapes:
+                k = sh[0]
+                if (k == "poly" and inside_poly(x, y, sh[1])) or \
+                   (k == "circle" and (x - sh[1]) ** 2 + (y - sh[2]) ** 2 <= sh[3] ** 2) or \
+                   (k == "rect" and sh[1] <= x < sh[3] and sh[2] <= y < sh[4]):
+                    col = sh[-1]
+            if col is None:
+                row += b"\x00\x00\x00\x00"
+            else:
+                f = 0.85 if y % 8 == 0 else 1.0  # layer lines
+                row += bytes((int(col[0] * f), int(col[1] * f), int(col[2] * f), 255))
+        rows.append(row)
+    return encode_png(w, h, rows)
+
+
+def thumb_cube():
+    cx, cy, s = 100, 110, 64
+    return render([
+        ("poly", [(cx - s * .87, cy - s / 2), (cx, cy), (cx, cy + s), (cx - s * .87, cy + s / 2)], (40, 140, 75)),
+        ("poly", [(cx, cy), (cx + s * .87, cy - s / 2), (cx + s * .87, cy + s / 2), (cx, cy + s)], (55, 170, 95)),
+        ("poly", [(cx, cy - s), (cx + s * .87, cy - s / 2), (cx, cy), (cx - s * .87, cy - s / 2)], (90, 200, 120)),
+    ])
+
+
+def thumb_benchy():
+    return render([
+        ("poly", [(18, 118), (182, 118), (160, 162), (44, 162)], (230, 120, 40)),     # hull
+        ("rect", 66, 76, 134, 120, (245, 150, 60)),                                     # cabin
+        ("rect", 58, 68, 142, 80, (200, 95, 30)),                                       # roof
+        ("rect", 112, 40, 126, 70, (200, 95, 30)),                                      # chimney
+        ("circle", 84, 98, 9, (60, 35, 20)), ("circle", 112, 98, 9, (60, 35, 20)),      # windows
+        ("rect", 18, 112, 182, 120, (200, 95, 30)),                                     # deck
+    ])
+
+
+def thumb_stealthburner():
+    return render([
+        ("rect", 52, 40, 148, 150, (40, 90, 200)),                                      # body
+        ("poly", [(52, 150), (148, 150), (118, 176), (82, 176)], (30, 70, 160)),        # lower shroud
+        ("circle", 100, 92, 38, (25, 55, 130)),                                         # fan duct
+        ("circle", 100, 92, 30, (210, 50, 60)),                                         # red fan
+        ("circle", 100, 92, 9, (25, 55, 130)),                                          # hub
+        ("poly", [(92, 176), (108, 176), (100, 190)], (230, 190, 60)),                  # nozzle
+    ])
+
+
+def thumb_square():
+    return render([
+        ("rect", 30, 30, 170, 170, (235, 200, 50)),
+        ("rect", 46, 46, 154, 154, (200, 165, 30)),
+        ("rect", 30, 96, 170, 104, (235, 200, 50)), ("rect", 96, 30, 104, 170, (235, 200, 50)),
+    ])
+
+
+# one thumbnail per mock file, keyed by file name (without .gcode)
+THUMBS = {f[0].split("/")[-1][:-6]: gen() for f, gen in zip(FILES, (thumb_cube, thumb_benchy, thumb_stealthburner, thumb_square))}
+THUMB = THUMBS[FILES[0][0][:-6]]
 START = time.time() - 3 * 86400 - 4 * 3600
 
 # ----------------------------------------------------------------------------- API
@@ -276,7 +319,8 @@ def metadata(name):
         "first_layer_extr_temp": f[7], "first_layer_bed_temp": f[8],
         "thumbnails": [
             {"width": 32, "height": 32, "size": 900, "relative_path": ".thumbs/%s-32x32.png" % f[0].split("/")[-1][:-6]},
-            {"width": 200, "height": 200, "size": len(THUMB), "relative_path": ".thumbs/%s-200x200.png" % f[0].split("/")[-1][:-6]},
+            {"width": 200, "height": 200, "size": len(THUMBS[f[0].split("/")[-1][:-6]]),
+             "relative_path": ".thumbs/%s-200x200.png" % f[0].split("/")[-1][:-6]},
         ],
     }
 
@@ -417,7 +461,8 @@ class Handler(BaseHTTPRequestHandler):
                 m = metadata(q.get("filename", [""])[0])
                 return self.send(200, {"result": m}) if m else self.err(404, "Metadata not available")
             if path.startswith("/server/files/gcodes/") and path.endswith(".png"):
-                return self.send(200, THUMB, "image/png")
+                name = unquote(path).split("/")[-1].rsplit("-", 1)[0]  # ".thumbs/<name>-200x200.png"
+                return self.send(200, THUMBS.get(name, THUMB), "image/png")
             if path == "/server/gcode_store":
                 n = int(q.get("count", ["50"])[0])
                 return self.send(200, {"result": {"gcode_store": S["console"][-n:]}})
