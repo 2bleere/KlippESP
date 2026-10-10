@@ -142,11 +142,11 @@ static void make_gauge(Gauge& gg, lv_obj_t* scr, const Box& b, const char* icon,
     gg.power = lv_bar_create(c);
     lv_obj_set_size(gg.power, inner - tx, 6);
     lv_obj_set_pos(gg.power, tx, 94);
-    lv_bar_set_range(gg.power, 0, 1000);  // progress toward the target temperature
+    lv_bar_set_range(gg.power, 0, 1000);  // temperature relative to the configured max_temp
 }
 
-// While a heater is on, arc and bar show progress toward the target, measured from room temperature
-// (20 C empty -> target full). When it's off, the arc shows the temperature on the heater's fixed scale.
+// Arc: while a heater is on, progress toward the target from room temperature (20 C empty -> target full);
+// while off, the temperature on the max scale. Bar: always the temperature relative to the configured max_temp.
 static void update_gauge(Gauge& gg, const MrTemp& t, bool present) {
     const float ROOM = 20;
     char buf[48];
@@ -162,19 +162,19 @@ static void update_gauge(Gauge& gg, const MrTemp& t, bool present) {
     bool atTarget = on && fabsf(t.temp - t.target) < 3;
     // blue = cold, orange = heating (or still hot after switching off), green = at target
     lv_color_t col = atTarget ? COL_GREEN : (on || t.temp > 45) ? COL_ORANGE : COL_COLD;
+    float maxT = t.maxTemp > 0 ? t.maxTemp : gg.max;
+    int ofMax = (int)constrain(t.temp / maxT * 1000, 0, 1000);
 
-    int scaled;
+    int arc = ofMax;
     if (on) {
         float span = t.target - ROOM;
         float p = span > 1 ? (t.temp - ROOM) / span : 1;
-        scaled = atTarget ? 1000 : (int)constrain(p * 1000, 0, 1000);
-    } else {
-        scaled = (int)constrain(t.temp / gg.max * 1000, 0, 1000);
+        arc = atTarget ? 1000 : (int)constrain(p * 1000, 0, 1000);
     }
-    lv_arc_set_value(gg.arc, scaled);
+    lv_arc_set_value(gg.arc, arc);
     set_arc_color(gg.arc, col);
     set_text_color(gg.icon, col);
-    lv_bar_set_value(gg.power, on ? scaled : 0, LV_ANIM_OFF);
+    lv_bar_set_value(gg.power, ofMax, LV_ANIM_OFF);
     set_bg_color(gg.power, col, LV_PART_INDICATOR);
 
     snprintf(buf, sizeof(buf), "%.0f" DEG, t.temp);

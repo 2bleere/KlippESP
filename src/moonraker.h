@@ -13,6 +13,7 @@ struct MrTemp {
     char obj[48];    // klipper object name, e.g. "heater_generic chamber"
     char label[32];  // display name, e.g. "chamber"
     float temp, target, power;
+    float maxTemp;   // configured max_temp (0 = unknown)
     bool settable;   // heater (true) or plain sensor (false)
 };
 

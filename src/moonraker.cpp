@@ -131,6 +131,21 @@ static String queryPath;
 
 static bool startsWith(const char* s, const char* p) { return strncmp(s, p, strlen(p)) == 0; }
 
+// Reads extruder / heater_bed max_temp from the Klipper config (filtered: the full config is large).
+static void loadMaxTemps(float& ext, float& bed) {
+    String body;
+    if (http("GET", "/printer/objects/query?configfile=settings", "", &body, 8000) != 200) return;
+    JsonDocument filter;
+    JsonObject f = filter["result"]["status"]["configfile"]["settings"].to<JsonObject>();
+    f["extruder"]["max_temp"] = true;
+    f["heater_bed"]["max_temp"] = true;
+    JsonDocument d;
+    if (deserializeJson(d, body, DeserializationOption::Filter(filter))) return;
+    JsonObject st = d["result"]["status"]["configfile"]["settings"];
+    ext = st["extruder"]["max_temp"] | 0.0f;
+    bed = st["heater_bed"]["max_temp"] | 0.0f;
+}
+
 static bool loadObjects() {
     String body;
     int code = http("GET", "/printer/objects/list", "", &body);
@@ -209,6 +224,13 @@ static bool loadObjects() {
         S.nFans = n.nFans;
         S.ext = n.ext;
         S.bed = n.bed;
+    }
+    {
+        float extMax = 0, bedMax = 0;
+        loadMaxTemps(extMax, bedMax);
+        Lock l;
+        S.ext.maxTemp = extMax;
+        S.bed.maxTemp = bedMax;
     }
     queryPath = q;
     return true;

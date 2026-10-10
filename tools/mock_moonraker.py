@@ -261,6 +261,7 @@ def status():
         "heater_fan hotend_fan": {"speed": 1.0 if S["ext"]["temp"] > 50 else 0.0},
         "controller_fan electronics": {"speed": 0.4 if S["homed"] else 0.0},
         "fan_generic nevermore": {"speed": S["nevermore"]},
+        "configfile": {"settings": {"extruder": {"max_temp": 300.0}, "heater_bed": {"max_temp": 120.0}}},
     }
 
 
