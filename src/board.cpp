@@ -115,9 +115,9 @@ void board_init(uint8_t rotation) {
     lcd.fillScreen(TFT_BLACK);
 
     lv_init();
-    // one internal, DMA-capable buffer of 40 lines (38 KB); no PSRAM on this board
+    // one internal, DMA-capable buffer of 20 lines (19 KB); RAM is tight without PSRAM
     static lv_disp_draw_buf_t draw_buf;
-    const size_t buf_px = LCD_W * 40;
+    const size_t buf_px = LCD_W * 20;
     lv_color_t* buf = (lv_color_t*)heap_caps_malloc(buf_px * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     lv_disp_draw_buf_init(&draw_buf, buf, nullptr, buf_px);
 

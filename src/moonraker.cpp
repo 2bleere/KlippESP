@@ -15,7 +15,6 @@ static std::vector<MrFile> files;
 static uint32_t filesVer = 0;
 static MrMeta meta;
 static uint32_t metaVer = 0;
-static MrThumb thumbs[2];
 static String consoleText;
 static uint32_t consoleVer = 0;
 static volatile bool consoleOn = false;
@@ -27,7 +26,7 @@ struct Lock {
     ~Lock() { xSemaphoreGive(mtx); }
 };
 
-enum CmdType : uint8_t { C_GCODE, C_PRINT, C_FILES, C_META, C_THUMB, C_POWER };
+enum CmdType : uint8_t { C_GCODE, C_PRINT, C_FILES, C_META, C_POWER };
 
 struct Cmd {
     CmdType t;
@@ -104,6 +103,34 @@ static int http(const char* method, const String& path, const String& body, Stri
     return code;
 }
 
+// GET + parse JSON straight from the socket (no String copy of the body: on this board the large temporary
+// buffers fragmented the heap). Returns the HTTP status, 599 if the body isn't valid JSON, < 0 on network errors.
+#define HTTP_BAD_JSON 599
+static int httpGetJson(const String& path, JsonDocument& d, JsonDocument* filter = nullptr, uint16_t timeoutMs = 4000) {
+    if (WiFi.status() != WL_CONNECTED || !cfg.host[0]) return -1;
+    WiFiClient wc;
+    HTTPClient h;
+    h.setConnectTimeout(3000);
+    h.setTimeout(timeoutMs);
+    h.setReuse(false);
+    if (!h.begin(wc, resolveHost(), cfg.port, path)) return -1;
+    if (cfg.apikey[0]) h.addHeader("X-Api-Key", cfg.apikey);
+    int code = h.GET();
+    if (code == 200) {
+        DeserializationError e;
+        if (h.getSize() >= 0) {  // Content-Length body: parse from the socket
+            Stream& st = h.getStream();
+            e = filter ? deserializeJson(d, st, DeserializationOption::Filter(*filter)) : deserializeJson(d, st);
+        } else {                 // chunked: buffer it
+            String body = h.getString();
+            e = filter ? deserializeJson(d, body, DeserializationOption::Filter(*filter)) : deserializeJson(d, body);
+        }
+        if (e) code = HTTP_BAD_JSON;
+    }
+    h.end();
+    return code;
+}
+
 // Extract Moonraker's {"error":{"message":...}} text.
 static void reportError(int code, const String& body, const char* what) {
     char buf[200];
@@ -133,25 +160,20 @@ static bool startsWith(const char* s, const char* p) { return strncmp(s, p, strl
 
 // Reads extruder / heater_bed max_temp from the Klipper config (filtered: the full config is large).
 static void loadMaxTemps(float& ext, float& bed) {
-    String body;
-    if (http("GET", "/printer/objects/query?configfile=settings", "", &body, 8000) != 200) return;
     JsonDocument filter;
     JsonObject f = filter["result"]["status"]["configfile"]["settings"].to<JsonObject>();
     f["extruder"]["max_temp"] = true;
     f["heater_bed"]["max_temp"] = true;
     JsonDocument d;
-    if (deserializeJson(d, body, DeserializationOption::Filter(filter))) return;
+    if (httpGetJson("/printer/objects/query?configfile=settings", d, &filter, 8000) != 200) return;
     JsonObject st = d["result"]["status"]["configfile"]["settings"];
     ext = st["extruder"]["max_temp"] | 0.0f;
     bed = st["heater_bed"]["max_temp"] | 0.0f;
 }
 
 static bool loadObjects() {
-    String body;
-    int code = http("GET", "/printer/objects/list", "", &body);
-    if (code != 200) return false;
     JsonDocument d;
-    if (deserializeJson(d, body)) return false;
+    if (httpGetJson("/printer/objects/list", d) != 200) return false;
 
     MrState n;
     memset(&n, 0, sizeof(n));
@@ -297,8 +319,8 @@ static void parseStatus(JsonObject st) {
 }
 
 static void pollPrinterInfo() {
-    String body;
-    int code = http("GET", "/printer/info", "", &body);
+    JsonDocument d;
+    int code = httpGetJson("/printer/info", d);
     Lock l;
     S.online = code > 0;
     S.ready = false;
@@ -307,15 +329,13 @@ static void pollPrinterInfo() {
         S.klippyMsg[0] = 0;
         return;
     }
-    JsonDocument d;
-    if (deserializeJson(d, body)) return;
     strlcpy(S.klippy, d["result"]["state"] | "unknown", sizeof(S.klippy));
     strlcpy(S.klippyMsg, d["result"]["state_message"] | "", sizeof(S.klippyMsg));
 }
 
 static void pollStatus() {
-    String body;
-    int code = http("GET", queryPath, "", &body);
+    JsonDocument d;
+    int code = httpGetJson(queryPath, d);
     if (code != 200) {
         objectsLoaded = false;  // klippy restarted or Moonraker gone; re-discover
         Lock l;
@@ -323,17 +343,13 @@ static void pollStatus() {
         S.ready = false;
         return;
     }
-    JsonDocument d;
-    if (deserializeJson(d, body)) return;
     { Lock l; S.online = true; }
     parseStatus(d["result"]["status"]);
 }
 
 static void pollConsole() {
-    String body;
-    if (http("GET", "/server/gcode_store?count=60", "", &body) != 200) return;
     JsonDocument d;
-    if (deserializeJson(d, body)) return;
+    if (httpGetJson("/server/gcode_store?count=40", d) != 200) return;
     String t;
     for (JsonObject e : d["result"]["gcode_store"].as<JsonArray>()) {
         const char* m = e["message"] | "";
@@ -349,15 +365,12 @@ static void pollConsole() {
 }
 
 static void pollPower() {
-    String body;
-    int code = http("GET", "/machine/device_power/devices", "", &body);
-    if (code != 200) {
+    JsonDocument d;
+    if (httpGetJson("/machine/device_power/devices", d) != 200) {
         Lock l;
         S.nPower = 0;
         return;
     }
-    JsonDocument d;
-    if (deserializeJson(d, body)) return;
     Lock l;
     S.nPower = 0;
     for (JsonObject o : d["result"]["devices"].as<JsonArray>()) {
@@ -373,8 +386,6 @@ static void pollPower() {
 static bool sysInfoLoaded = false;
 
 static void pollProcStats() {
-    String body;
-    if (http("GET", "/machine/proc_stats", "", &body) != 200) return;
     JsonDocument filter;
     JsonObject f = filter["result"].to<JsonObject>();
     f["system_cpu_usage"]["cpu"] = true;
@@ -383,7 +394,7 @@ static void pollProcStats() {
     f["system_uptime"] = true;
     f["throttled_state"] = true;
     JsonDocument d;
-    if (deserializeJson(d, body, DeserializationOption::Filter(filter))) return;
+    if (httpGetJson("/machine/proc_stats", d, &filter) != 200) return;
     JsonObject r = d["result"];
     Lock l;
     MrHost& h = S.host;
@@ -404,12 +415,10 @@ static void pollProcStats() {
 }
 
 static void pollDisk() {
-    String body;
-    if (http("GET", "/server/files/directory?path=gcodes&extended=false", "", &body, 6000) != 200) return;
     JsonDocument filter;
     filter["result"]["disk_usage"] = true;
     JsonDocument d;
-    if (deserializeJson(d, body, DeserializationOption::Filter(filter))) return;
+    if (httpGetJson("/server/files/directory?path=gcodes&extended=false", d, &filter, 6000) != 200) return;
     JsonObject du = d["result"]["disk_usage"];
     Lock l;
     S.host.diskTotal = du["total"] | 0ULL;
@@ -417,14 +426,12 @@ static void pollDisk() {
 }
 
 static void loadSystemInfo() {
-    String body;
-    if (http("GET", "/machine/system_info", "", &body, 6000) != 200) return;
     JsonDocument filter;
     JsonObject f = filter["result"]["system_info"].to<JsonObject>();
     f["cpu_info"] = true;
     f["distribution"]["name"] = true;
     JsonDocument d;
-    if (deserializeJson(d, body, DeserializationOption::Filter(filter))) return;
+    if (httpGetJson("/machine/system_info", d, &filter, 6000) != 200) return;
     JsonObject si = d["result"]["system_info"];
     JsonObject ci = si["cpu_info"];
     const char* model = ci["model"] | "";
@@ -446,7 +453,6 @@ static void pollHost(uint32_t tick) {
 
 static void pollTask(void*) {
     uint32_t tick = 0;
-    String lastFile;
     for (;;) {
         if (paused) {
             vTaskDelay(pdMS_TO_TICKS(200));
@@ -487,14 +493,6 @@ static void pollTask(void*) {
             pollHost(tick);
         }
 
-        // fetch the thumbnail of the job being printed when it changes
-        String f;
-        { Lock l; f = S.file; }
-        if (f != lastFile) {
-            lastFile = f;
-            if (f.length()) enqueue(C_THUMB, f.c_str(), THUMB_PRINT);
-        }
-
         tick++;
         uint32_t dt = millis() - t0;
         vTaskDelay(pdMS_TO_TICKS(dt < 1000 ? 1000 - dt : 50));
@@ -503,12 +501,16 @@ static void pollTask(void*) {
 
 // ---------------------------------------------------------------- commands
 
+#define MAX_FILES 60  // file list cap (RAM: no PSRAM on this board)
+
 static void doFiles() {
-    String body;
-    int code = http("GET", "/server/files/list?root=gcodes", "", &body, 8000);
-    if (code != 200) return reportError(code, body, "File list");
+    JsonDocument filter;
+    filter["result"][0]["path"] = true;
+    filter["result"][0]["modified"] = true;
+    filter["result"][0]["size"] = true;
     JsonDocument d;
-    if (deserializeJson(d, body)) return setErr("File list: bad JSON");
+    int code = httpGetJson("/server/files/list?root=gcodes", d, &filter, 8000);
+    if (code != 200) return reportError(code, "", "File list");
     std::vector<MrFile> v;
     for (JsonObject o : d["result"].as<JsonArray>()) {
         MrFile f;
@@ -518,70 +520,20 @@ static void doFiles() {
         if (f.path.length()) v.push_back(f);
     }
     std::sort(v.begin(), v.end(), [](const MrFile& a, const MrFile& b) { return a.modified > b.modified; });
-    if (v.size() > 200) v.resize(200);
+    if (v.size() > MAX_FILES) v.resize(MAX_FILES);
     Lock l;
     files.swap(v);
     filesVer++;
 }
 
-// No PSRAM on this board: use the slicer's small thumbnail (decoded RGB is w*h*3 bytes in internal RAM).
-#define THUMB_MAX_W 120
-#define THUMB_MAX_BYTES 60000
-
-static void doThumb(const char* file, JsonArray thumbsArr, int slot) {
-    // pick the largest thumbnail no wider than THUMB_MAX_W (else the smallest)
-    JsonObject best;
-    int bestW = 0, smallW = 99999;
-    JsonObject small;
-    for (JsonObject t : thumbsArr) {
-        int w = t["width"] | 0;
-        if (w <= THUMB_MAX_W && w > bestW) { best = t; bestW = w; }
-        if (w < smallW) { small = t; smallW = w; }
-    }
-    if (best.isNull()) best = small;
-    if (best.isNull()) return;
-    const char* rel = best["relative_path"] | "";
-    if (!rel[0]) return;
-
-    String dir = file;
-    int slash = dir.lastIndexOf('/');
-    dir = slash >= 0 ? dir.substring(0, slash + 1) : "";
-    String path = "/server/files/gcodes/" + urlEnc((dir + rel).c_str(), true);
-
-    WiFiClient wc;
-    HTTPClient h;
-    h.setConnectTimeout(3000);
-    h.setTimeout(6000);
-    if (!h.begin(wc, resolveHost(), cfg.port, path)) return;
-    if (cfg.apikey[0]) h.addHeader("X-Api-Key", cfg.apikey);
-    int code = h.GET();
-    int len = h.getSize();
-    if (code != 200 || len <= 24 || len > THUMB_MAX_BYTES) { h.end(); return; }
-    uint8_t* buf = (uint8_t*)malloc(len);
-    if (!buf) { h.end(); return; }
-    WiFiClient* s = h.getStreamPtr();
-    int got = 0;
-    uint32_t t0 = millis();
-    while (got < len && millis() - t0 < 8000) {
-        int a = s->available();
-        if (a > 0) got += s->readBytes(buf + got, std::min(a, len - got));
-        else if (!s->connected()) break;
-        else delay(2);
-    }
-    h.end();
-    if (got != len || memcmp(buf + 1, "PNG", 3) != 0) { free(buf); return; }
-
-    Lock l;
-    if (thumbs[slot].data) free(thumbs[slot].data);
-    thumbs[slot].data = buf;
-    thumbs[slot].len = len;
-    thumbs[slot].w = (buf[18] << 8) | buf[19];
-    thumbs[slot].h = (buf[22] << 8) | buf[23];
-}
-
-static void doMeta(const char* file, int slot, bool storeMeta) {
-    String body;
-    int code = http("GET", "/server/files/metadata?filename=" + urlEnc(file, false), "", &body, 6000);
+static void doMeta(const char* file, bool storeMeta) {
+    JsonDocument filter;
+    JsonObject fr = filter["result"].to<JsonObject>();
+    for (const char* k : {"estimated_time", "filament_total", "filament_weight_total", "object_height", "layer_count",
+                          "first_layer_extr_temp", "first_layer_bed_temp", "slicer"})
+        fr[k] = true;
+    JsonDocument d;
+    int code = httpGetJson("/server/files/metadata?filename=" + urlEnc(file, false), d, &filter, 6000);
     if (code != 200) {
         if (storeMeta) {
             Lock l;
@@ -591,8 +543,6 @@ static void doMeta(const char* file, int slot, bool storeMeta) {
         }
         return;
     }
-    JsonDocument d;
-    if (deserializeJson(d, body)) return;
     JsonObject r = d["result"];
     if (storeMeta) {
         Lock l;
@@ -609,7 +559,6 @@ static void doMeta(const char* file, int slot, bool storeMeta) {
         strlcpy(meta.slicer, r["slicer"] | "", sizeof(meta.slicer));
         metaVer++;
     }
-    doThumb(file, r["thumbnails"], slot);
 }
 
 static void cmdTask(void*) {
@@ -639,8 +588,7 @@ static void cmdTask(void*) {
                 else pollPower();
                 break;
             case C_FILES: doFiles(); break;
-            case C_META: doMeta(c.a, c.slot, true); break;
-            case C_THUMB: doMeta(c.a, c.slot, false); break;
+            case C_META: doMeta(c.a, true); break;
         }
     }
 }
@@ -697,7 +645,7 @@ void mr_post(const char* path) {
 void mr_print_file(const char* file) { enqueue(C_PRINT, file); }
 void mr_power_toggle(const char* device) { enqueue(C_POWER, device); }
 void mr_request_files() { enqueue(C_FILES, ""); }
-void mr_request_meta(const char* file) { enqueue(C_META, file, THUMB_DETAIL); }
+void mr_request_meta(const char* file) { enqueue(C_META, file); }
 
 uint32_t mr_files(std::vector<MrFile>& out) {
     Lock l;
@@ -711,13 +659,6 @@ uint32_t mr_meta(MrMeta* out) {
     return metaVer;
 }
 
-bool mr_take_thumb(int slot, MrThumb* out) {
-    Lock l;
-    if (!thumbs[slot].data) return false;
-    *out = thumbs[slot];
-    thumbs[slot].data = nullptr;
-    return true;
-}
 
 void mr_console_active(bool on) { consoleOn = on; }
 

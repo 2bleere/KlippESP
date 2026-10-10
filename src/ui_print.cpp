@@ -4,55 +4,6 @@
 #include "board.h"
 #include <time.h>
 
-// ---------------------------------------------------------------- thumbnail holder
-
-struct Thumb {
-    MrThumb t = {nullptr, 0, 0, 0};
-    lv_img_dsc_t dsc;
-};
-
-static void thumb_apply(Thumb& th, MrThumb& nt, lv_obj_t* img, lv_coord_t box) {
-    if (img) lv_img_set_src(img, nullptr);
-    lv_img_cache_invalidate_src(nullptr);
-    if (th.t.data) free(th.t.data);
-    th.t = nt;
-    memset(&th.dsc, 0, sizeof(th.dsc));
-    th.dsc.header.always_zero = 0;
-    th.dsc.header.cf = LV_IMG_CF_RAW_ALPHA;
-    th.dsc.header.w = nt.w;
-    th.dsc.header.h = nt.h;
-    th.dsc.data_size = nt.len;
-    th.dsc.data = nt.data;
-    if (img) {
-        lv_img_set_src(img, &th.dsc);
-        uint16_t m = nt.w > nt.h ? nt.w : nt.h;
-        if (m) lv_img_set_zoom(img, (uint16_t)(256L * box / m));
-    }
-}
-
-static void thumb_show(Thumb& th, lv_obj_t* img, lv_coord_t box) {
-    if (!th.t.data || !img) return;
-    lv_img_set_src(img, &th.dsc);
-    uint16_t m = th.t.w > th.t.h ? th.t.w : th.t.h;
-    if (m) lv_img_set_zoom(img, (uint16_t)(256L * box / m));
-}
-
-static Thumb detailThumb, printThumb;
-static char printThumbFile[128];
-
-void ui_print_thumb(lv_obj_t* img, lv_coord_t box) {
-    static lv_obj_t* shown = nullptr;
-    MrThumb nt;
-    if (mr_take_thumb(THUMB_PRINT, &nt)) {
-        thumb_apply(printThumb, nt, img, box);
-        strlcpy(printThumbFile, g.file, sizeof(printThumbFile));
-        shown = img;
-    } else if (shown != img && printThumb.t.data && !strcmp(printThumbFile, g.file)) {
-        thumb_show(printThumb, img, box);
-        shown = img;
-    }
-}
-
 static const char* basename_of(const char* p) {
     const char* s = strrchr(p, '/');
     return s ? s + 1 : p;
@@ -67,7 +18,6 @@ static std::vector<MrFile> fFiles;
 
 // detail dialog
 static lv_obj_t* dOverlay;
-static lv_obj_t* dImg;
 static lv_obj_t* dInfo;
 static char dFile[128];
 static uint32_t dMetaVer;
@@ -76,7 +26,6 @@ static void detail_close(lv_event_t*) {
     if (!dOverlay) return;
     lv_obj_del_async(dOverlay);
     dOverlay = nullptr;
-    dImg = nullptr;
 }
 
 static void detail_print(lv_event_t*) {
@@ -84,14 +33,11 @@ static void detail_print(lv_event_t*) {
     mr_print_file(dFile);
     lv_obj_del_async(dOverlay);
     dOverlay = nullptr;
-    dImg = nullptr;
     ui_toast("Starting print...");
 }
 
 static void open_detail(const char* file) {
     strlcpy(dFile, file, sizeof(dFile));
-    MrThumb stale;
-    if (mr_take_thumb(THUMB_DETAIL, &stale)) free(stale.data);
     MrMeta m;
     dMetaVer = mr_meta(&m);
     mr_request_meta(file);
@@ -118,8 +64,6 @@ static void open_detail(const char* file) {
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t* ph = ui_label(box, ICON_CUBE, &icons_28, COL_DIM);
     lv_obj_center(ph);
-    dImg = lv_img_create(box);
-    lv_obj_center(dImg);
 
     dInfo = ui_label(c, "Loading...", &lv_font_montserrat_14, COL_TEXT);
     lv_obj_set_pos(dInfo, 152, 30);
@@ -154,8 +98,6 @@ static void detail_update() {
         }
         set_text(dInfo, buf);
     }
-    MrThumb nt;
-    if (mr_take_thumb(THUMB_DETAIL, &nt)) thumb_apply(detailThumb, nt, dImg, 136);
 }
 
 static void file_click(lv_event_t* e) {
@@ -234,122 +176,6 @@ void scr_files(lv_obj_t* p) {
     if (!fFiles.empty()) files_rebuild();
     mr_request_files();
     ui_set_update(files_update);
-}
-
-// ================================================================ PRINTING
-
-static lv_obj_t *pImg, *pName, *pPct, *pBar, *pState, *pTimes, *pInfo, *pTemps, *pBtnPause, *pBtnCancel, *pBtnTune, *pBtnZ;
-
-static void pause_cb(lv_event_t*) {
-    if (!strcmp(g.pstate, "printing")) mr_post("/printer/print/pause");
-    else if (!strcmp(g.pstate, "paused")) mr_post("/printer/print/resume");
-    else ui_goto(S_HOME);
-}
-static void cancel_yes(void*) { mr_post("/printer/print/cancel"); }
-static void cancel_cb(lv_event_t*) {
-    if (is_printing()) ui_confirm("Cancel print", "Are you sure you want to cancel the current print?", cancel_yes);
-    else if (g.file[0]) mr_print_file(g.file);  // "Reprint" when the job has finished
-}
-static void tune_cb(lv_event_t*) { ui_goto(S_FANS); }
-static void z_cb(lv_event_t*) { ui_goto(S_ZOFFSET); }
-
-static void printing_update() {
-    char buf[200], a[24], b[24];
-
-    MrThumb nt;
-    if (mr_take_thumb(THUMB_PRINT, &nt)) {
-        thumb_apply(printThumb, nt, pImg, 126);
-        strlcpy(printThumbFile, g.file, sizeof(printThumbFile));
-    }
-    set_text(pName, g.file[0] ? basename_of(g.file) : "No active print");
-
-    snprintf(buf, sizeof(buf), "%.0f%%", g.progress * 100);
-    set_text(pPct, buf);
-    lv_bar_set_value(pBar, (int)(g.progress * 1000), LV_ANIM_OFF);
-    set_text(pState, g.message[0] && is_printing() ? g.message : g.pstate);
-    set_text_color(pState, state_color(g.pstate));
-    set_bg_color(pBar, state_color(g.pstate), LV_PART_INDICATOR);
-
-    float remain = g.progress > 0.005f ? g.printDur / g.progress - g.printDur : 0;
-    fmt_dur(a, sizeof(a), g.printDur);
-    fmt_dur(b, sizeof(b), remain);
-    snprintf(buf, sizeof(buf), "Elapsed %s\nLeft %s", a, g.progress > 0.005f ? b : "-");
-    set_text(pTimes, buf);
-
-    char layer[24] = "-";
-    if (g.layers > 0) snprintf(layer, sizeof(layer), "%d / %d", g.layer, g.layers);
-    snprintf(buf, sizeof(buf), "Layer %s\nZ %.2f mm\n%.2f m", layer, g.pos[2], g.filamentUsed / 1000.0f);
-    set_text(pInfo, buf);
-
-    float fan = 0;
-    for (int i = 0; i < g.nFans; i++)
-        if (g.fans[i].kind == FAN_PART) fan = g.fans[i].speed;
-    snprintf(buf, sizeof(buf),
-             "Hotend %.0f/%.0f" DEG "   Bed %.0f/%.0f" DEG "\n"
-             "Spd %.0f%%  Flow %.0f%%  Fan %.0f%%  Z %+.3f",
-             g.ext.temp, g.ext.target, g.bed.temp, g.bed.target,
-             g.speedFactor * 100, g.extrudeFactor * 100, fan * 100, g.zOffset);
-    set_text(pTemps, buf);
-
-    bool printing = !strcmp(g.pstate, "printing");
-    bool paused = !strcmp(g.pstate, "paused");
-    ui_btn_text(pBtnPause, printing ? LV_SYMBOL_PAUSE "\nPause" : paused ? LV_SYMBOL_PLAY "\nResume" : LV_SYMBOL_HOME "\nHome");
-    set_bg_color(pBtnPause, printing ? COL_ORANGE : paused ? COL_GREEN : COL_BTN, 0);
-    ui_btn_text(pBtnCancel, is_printing() ? LV_SYMBOL_STOP "\nCancel" : LV_SYMBOL_REFRESH "\nReprint");
-    if (!is_printing() && !g.file[0]) lv_obj_add_state(pBtnCancel, LV_STATE_DISABLED);
-    else lv_obj_clear_state(pBtnCancel, LV_STATE_DISABLED);
-}
-
-void scr_printing(lv_obj_t* p) {
-    lv_obj_t* l = ui_card(p, 6, 6, 146, 268);
-    lv_obj_t* box = lv_obj_create(l);
-    lv_obj_set_size(box, 130, 130);
-    set_bg_color(box, COL_BG, 0);
-    lv_obj_set_style_border_width(box, 0, 0);
-    lv_obj_set_style_pad_all(box, 0, 0);
-    lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_t* ph = ui_label(box, ICON_CUBE, &icons_28, COL_DIM);
-    lv_obj_center(ph);
-    pImg = lv_img_create(box);
-    lv_obj_center(pImg);
-    if (!strcmp(printThumbFile, g.file)) thumb_show(printThumb, pImg, 126);
-
-    pName = ui_label(l, "", &lv_font_montserrat_12);
-    lv_label_set_long_mode(pName, LV_LABEL_LONG_DOT);
-    lv_obj_set_size(pName, 130, 46);
-    lv_obj_set_pos(pName, 0, 136);
-    pTimes = ui_label(l, "", &lv_font_montserrat_14, COL_DIM);
-    lv_obj_set_pos(pTimes, 0, 214);
-
-    lv_obj_t* r = ui_card(p, 158, 6, 316, 118);
-    pPct = ui_label(r, "", &lv_font_montserrat_28);
-    pState = ui_label(r, "", &lv_font_montserrat_14);
-    lv_label_set_long_mode(pState, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(pState, 190);
-    lv_obj_set_pos(pState, 0, 38);
-    pInfo = ui_label(r, "", &lv_font_montserrat_12, COL_TEXT);
-    lv_obj_set_style_text_align(pInfo, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_align(pInfo, LV_ALIGN_TOP_RIGHT, 0, 0);
-    pBar = lv_bar_create(r);
-    lv_obj_set_size(pBar, 300, 16);
-    lv_obj_align(pBar, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_bar_set_range(pBar, 0, 1000);
-
-    lv_obj_t* t = ui_card(p, 158, 130, 316, 66);
-    pTemps = ui_label(t, "", &lv_font_montserrat_14);
-    lv_obj_set_style_text_line_space(pTemps, 6, 0);
-
-    lv_obj_t* row = ui_row(p, 316, 72);
-    lv_obj_set_pos(row, 158, 202);
-    lv_obj_set_style_pad_column(row, 4, 0);
-    pBtnPause = ui_btn(row, "", 76, 72, pause_cb);
-    pBtnCancel = ui_btn(row, "", 76, 72, cancel_cb, nullptr, COL_RED);
-    pBtnTune = ui_btn(row, LV_SYMBOL_LOOP "\nTune", 76, 72, tune_cb);
-    pBtnZ = ui_btn(row, LV_SYMBOL_UP LV_SYMBOL_DOWN "\nZ offset", 76, 72, z_cb);
-    lv_obj_t* btns[] = {pBtnPause, pBtnCancel, pBtnTune, pBtnZ};
-    for (lv_obj_t* b : btns) lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
-
-    ui_set_update(printing_update);
 }
 
 // ================================================================ Z OFFSET

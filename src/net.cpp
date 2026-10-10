@@ -1,4 +1,5 @@
 #include "net.h"
+#include <lvgl.h>
 #include "settings.h"
 #include "moonraker.h"
 #include "ui.h"
@@ -23,11 +24,13 @@ static uint32_t lastConnected = 0;  // last time the STA link was up (or a conne
 static void logln(const String& s) { Serial.println(s); }
 
 static void log_status(const char* tag) {
-    char b[200];
-    snprintf(b, sizeof(b), "[%s] up %lus wifi=%s rssi=%d ip=%s ap=%d heap=%u min=%u blk=%u psram=%u", tag,
+    lv_mem_monitor_t mon;
+    lv_mem_monitor(&mon);
+    char b[260];
+    snprintf(b, sizeof(b), "[%s] up %lus wifi=%s rssi=%d ip=%s ap=%d heap=%u min=%u blk=%u lvgl=%u%% frag=%u%%", tag,
              (unsigned long)(millis() / 1000), WiFi.status() == WL_CONNECTED ? "ok" : "down", WiFi.RSSI(),
              WiFi.localIP().toString().c_str(), apActive, (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMinFreeHeap(),
-             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT), (unsigned)ESP.getFreePsram());
+             (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT), mon.used_pct, mon.frag_pct);
     logln(b);
 }
 static String ssidList;  // cached scan results as HTML buttons

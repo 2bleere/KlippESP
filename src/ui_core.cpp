@@ -333,6 +333,8 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
 void ui_set_update(void (*fn)()) { upd = fn; }
 Scr ui_current() { return cur; }
 
+static void update_badge();
+
 static void build(Scr s) {
     upd = nullptr;
     mr_console_active(false);
@@ -342,11 +344,14 @@ static void build(Scr s) {
     if (s == S_HOME) {
         lv_obj_add_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(lblTitle, 10);
+        lv_obj_set_pos(lblTitle, 8, 7);
+        lv_obj_set_style_bg_opa(lblTitle, LV_OPA_COVER, 0);  // state badge (update_badge)
+        update_badge();
     } else {
         lv_obj_clear_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(lblTitle, 98);
+        lv_obj_set_pos(lblTitle, 98, 11);
+        lv_obj_set_style_bg_opa(lblTitle, LV_OPA_TRANSP, 0);
     }
     builders[s](content);
     if (upd) upd();
@@ -393,6 +398,9 @@ static void build_topbar(lv_obj_t* scr) {
 
     lblTitle = ui_label(bar, "", &lv_font_montserrat_16);
     lv_obj_set_pos(lblTitle, 98, 11);
+    lv_obj_set_style_radius(lblTitle, 8, 0);
+    lv_obj_set_style_pad_hor(lblTitle, 10, 0);
+    lv_obj_set_style_pad_ver(lblTitle, 4, 0);
 
     // temps + wifi + E-STOP; tapping the temps opens the temperature screen
     lv_obj_t* r = ui_row(bar, 236, TOPBAR_H);
@@ -410,7 +418,31 @@ static void build_topbar(lv_obj_t* scr) {
     lv_obj_set_style_text_font(es, &lv_font_montserrat_14, 0);
 }
 
+// Home shows a coloured state badge where other screens show their title.
+static void update_badge() {
+    const char *icon, *text;
+    lv_color_t col;
+    bool heating = g.ext.target > 0 || (g.hasBed && g.bed.target > 0);
+    if (net_ap_active()) { icon = LV_SYMBOL_WIFI; text = "Setup"; col = COL_ACCENT; }
+    else if (!g.wifi) { icon = LV_SYMBOL_WIFI; text = "No Wi-Fi"; col = COL_RED; }
+    else if (!g.online) { icon = LV_SYMBOL_CLOSE; text = "Offline"; col = COL_RED; }
+    else if (!g.ready) {
+        bool starting = !strcmp(g.klippy, "startup");
+        icon = starting ? LV_SYMBOL_REFRESH : LV_SYMBOL_WARNING;
+        text = starting ? "Starting" : !strcmp(g.klippy, "shutdown") ? "Shutdown" : "Error";
+        col = starting ? COL_ORANGE : COL_RED;
+    } else if (!strcmp(g.pstate, "printing")) { icon = LV_SYMBOL_PLAY; text = "Printing"; col = COL_ACCENT; }
+    else if (!strcmp(g.pstate, "paused")) { icon = LV_SYMBOL_PAUSE; text = "Paused"; col = COL_ORANGE; }
+    else if (heating) { icon = LV_SYMBOL_UP; text = "Heating"; col = COL_ORANGE; }
+    else { icon = LV_SYMBOL_OK; text = "Ready"; col = COL_GREEN; }
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%s %s", icon, text);
+    set_text(lblTitle, buf);
+    set_bg_color(lblTitle, col, 0);
+}
+
 static void update_topbar() {
+    if (cur == S_HOME) update_badge();
     char buf[48];
     snprintf(buf, sizeof(buf), "E %.0f/%.0f" DEG, g.ext.temp, g.ext.target);
     set_text(lblExt, g.ready ? buf : "");
@@ -451,7 +483,7 @@ static void update_sleep() {
 
 static void tick_cb(lv_timer_t*) {
     static uint32_t lastErr = 0;
-    static char lastPstate[16] = "";
+    static char lastPstate[20] = "";
     static bool first = true;
 
     mr_get(&g);
@@ -466,10 +498,19 @@ static void tick_cb(lv_timer_t*) {
         ui_toast(g.err, true);
     }
 
-    // jump to the status screen when a print starts (also when started from Mainsail)
-    bool wasPrinting = !strcmp(lastPstate, "printing") || !strcmp(lastPstate, "paused");
-    if (g.ready && is_printing() && !wasPrinting && cur != S_PRINTING && cur != S_CONNECT) ui_goto(S_PRINTING);
-    if (g.ready) strlcpy(lastPstate, g.pstate, sizeof(lastPstate));
+    // Follow the printer: any job state change (start, pause, resume, complete, cancel, error) shows the status
+    // page; Klipper going down shows Home (with Restart buttons); a finished job being cleared returns Home.
+    // Started from the touch screen or from Mainsail alike. Not while the user is typing on Connection.
+    char key[20];
+    strlcpy(key, !g.online ? "offline" : !g.ready ? g.klippy : g.pstate, sizeof(key));
+    if (strcmp(key, lastPstate) && lastPstate[0] && cur != S_CONNECT) {
+        bool job = g.ready && (is_printing() || !strcmp(g.pstate, "complete") || !strcmp(g.pstate, "cancelled") ||
+                               (!strcmp(g.pstate, "error") && g.file[0]));
+        if (job && cur != S_PRINTING) ui_goto(S_PRINTING);
+        else if (!job && g.online && !g.ready && cur != S_HOME) ui_goto(S_HOME);
+        else if (!job && g.ready && cur == S_PRINTING) ui_goto(S_HOME);
+    }
+    strlcpy(lastPstate, key, sizeof(lastPstate));
 
     update_sleep();
     if (upd) upd();
@@ -515,121 +556,4 @@ void ui_init() {
     build(S_HOME);
 
     lv_timer_create(tick_cb, 500, nullptr);
-}
-
-// ================================================================ HOME
-
-static lv_obj_t *hExtT, *hExtTg, *hBedT, *hBedTg, *hExtra, *hStatus, *hBtnRow, *hBtnRestart, *hBtnFw, *hBtnConn, *hPrintTile;
-
-static void home_tile_cb(lv_event_t* e) {
-    Scr s = (Scr)(intptr_t)lv_event_get_user_data(e);
-    if (s == S_FILES && is_printing()) s = S_PRINTING;
-    ui_goto(s);
-}
-static void restart_cb(lv_event_t*) { mr_post("/printer/restart"); }
-static void fwrestart_cb(lv_event_t*) { mr_post("/printer/firmware_restart"); }
-static void conn_cb(lv_event_t*) { ui_goto(S_CONNECT); }
-
-static void home_update() {
-    char buf[256];
-    snprintf(buf, sizeof(buf), "%.1f" DEG, g.ext.temp);
-    set_text(hExtT, buf);
-    snprintf(buf, sizeof(buf), "target %.0f" DEG, g.ext.target);
-    set_text(hExtTg, buf);
-    snprintf(buf, sizeof(buf), "%.1f" DEG, g.bed.temp);
-    set_text(hBedT, g.hasBed ? buf : "--");
-    snprintf(buf, sizeof(buf), "target %.0f" DEG, g.bed.target);
-    set_text(hBedTg, g.hasBed ? buf : "");
-
-    String ex;
-    for (int i = 0; i < g.nExtra && i < 2; i++) {
-        snprintf(buf, sizeof(buf), "%s: %.1f" DEG "\n", g.extra[i].label, g.extra[i].temp);
-        ex += buf;
-    }
-    set_text(hExtra, ex.c_str());
-
-    bool showConn = !g.online;
-    bool showRestart = g.online && !g.ready;
-    if (net_ap_active()) snprintf(buf, sizeof(buf), "Setup: join Wi-Fi\n\"%s\"", SETUP_AP_SSID);
-    else if (!g.wifi) snprintf(buf, sizeof(buf), "Connecting to\n%s...", cfg.ssid);
-    else if (!g.online) snprintf(buf, sizeof(buf), "Printer offline\n%s:%u", cfg.host, cfg.port);
-    else if (!g.ready) snprintf(buf, sizeof(buf), "Klipper %s", g.klippy);
-    else if (is_printing()) snprintf(buf, sizeof(buf), "%s %.0f%%", g.pstate, g.progress * 100);
-    else snprintf(buf, sizeof(buf), "%s", g.message[0] ? g.message : "Ready");
-    set_text(hStatus, buf);
-    set_text_color(hStatus, !g.ready ? COL_ORANGE : COL_DIM);
-
-    if (showConn || showRestart) lv_obj_clear_flag(hBtnRow, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(hBtnRow, LV_OBJ_FLAG_HIDDEN);
-    if (showConn) lv_obj_clear_flag(hBtnConn, LV_OBJ_FLAG_HIDDEN);
-    else lv_obj_add_flag(hBtnConn, LV_OBJ_FLAG_HIDDEN);
-    if (showRestart) {
-        lv_obj_clear_flag(hBtnRestart, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_clear_flag(hBtnFw, LV_OBJ_FLAG_HIDDEN);
-    } else {
-        lv_obj_add_flag(hBtnRestart, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(hBtnFw, LV_OBJ_FLAG_HIDDEN);
-    }
-    set_text(lv_obj_get_child(hPrintTile, 1), is_printing() ? "Status" : "Print");
-}
-
-void scr_home(lv_obj_t* p) {
-    lv_obj_t* c = ui_card(p, 6, 6, 160, 268);
-
-    ui_label(c, ICON_NOZZLE " Hotend", &icons_20, COL_DIM);
-    hExtT = ui_label(c, "", &lv_font_montserrat_28);
-    lv_obj_set_pos(hExtT, 0, 22);
-    hExtTg = ui_label(c, "", &lv_font_montserrat_14, COL_DIM);
-    lv_obj_set_pos(hExtTg, 0, 54);
-
-    lv_obj_t* l = ui_label(c, ICON_BED " Bed", &icons_20, COL_DIM);
-    lv_obj_set_pos(l, 0, 76);
-    hBedT = ui_label(c, "", &lv_font_montserrat_28);
-    lv_obj_set_pos(hBedT, 0, 98);
-    hBedTg = ui_label(c, "", &lv_font_montserrat_14, COL_DIM);
-    lv_obj_set_pos(hBedTg, 0, 130);
-
-    hExtra = ui_label(c, "", &lv_font_montserrat_12, COL_TEXT);
-    lv_obj_set_pos(hExtra, 0, 152);
-
-    hStatus = ui_label(c, "", &lv_font_montserrat_12, COL_DIM);
-    lv_label_set_long_mode(hStatus, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(hStatus, 144);
-    lv_obj_set_pos(hStatus, 0, 186);
-
-    hBtnRow = ui_row(c, 144, 30);
-    lv_obj_align(hBtnRow, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_pad_column(hBtnRow, 4, 0);
-    hBtnRestart = ui_btn(hBtnRow, "Restart", 70, 30, restart_cb);
-    hBtnFw = ui_btn(hBtnRow, "FW", 70, 30, fwrestart_cb, nullptr, COL_ORANGE);
-    hBtnConn = ui_btn(hBtnRow, LV_SYMBOL_WIFI " Connect", 144, 30, conn_cb, nullptr, COL_ACCENT);
-    lv_obj_set_style_text_font(hBtnRestart, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_font(hBtnFw, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_font(hBtnConn, &lv_font_montserrat_14, 0);
-
-    lv_obj_t* grid = lv_obj_create(p);
-    lv_obj_set_pos(grid, 172, 6);
-    lv_obj_set_size(grid, 302, 268);
-    lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(grid, 0, 0);
-    lv_obj_set_style_pad_all(grid, 0, 0);
-    lv_obj_set_style_pad_row(grid, 5, 0);
-    lv_obj_set_style_pad_column(grid, 5, 0);
-    lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
-
-    struct T { const char* icon; const char* txt; Scr s; };
-    static const T tiles[] = {
-        {ICON_PRINTER, "Print", S_FILES},          {ICON_THERMO, "Temperature", S_TEMP},
-        {ICON_POS, "Move", S_MOVE},                {ICON_NOZZLE, "Extrude", S_EXTRUDE},
-        {ICON_FAN, "Fans & Speed", S_FANS},        {LV_SYMBOL_LIST, "Macros", S_MACROS},
-        {LV_SYMBOL_KEYBOARD, "Console", S_CONSOLE}, {LV_SYMBOL_POWER, "Power", S_POWER},
-        {LV_SYMBOL_SETTINGS, "Settings", S_SETTINGS},
-    };
-    for (auto& t : tiles) {
-        lv_obj_t* b = ui_tile(grid, t.icon, t.txt, 97, 86, home_tile_cb, (void*)(intptr_t)t.s,
-                              t.s == S_FILES ? COL_ACCENT : COL_BTN);
-        if (t.s == S_FILES) hPrintTile = b;
-    }
-    ui_set_update(home_update);
 }

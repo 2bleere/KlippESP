@@ -8,12 +8,13 @@
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 0
 
-/* libc heap (no PSRAM on the WT32-SC01) */
-#define LV_MEM_CUSTOM 1
-#define LV_MEM_CUSTOM_INCLUDE <stdlib.h>
-#define LV_MEM_CUSTOM_ALLOC malloc
-#define LV_MEM_CUSTOM_FREE free
-#define LV_MEM_CUSTOM_REALLOC realloc
+/* LVGL's own memory pool, allocated once at lv_init(): keeps UI allocations from fragmenting the heap the
+   network stack needs (no PSRAM on the WT32-SC01) */
+#define LV_MEM_CUSTOM 0
+#define LV_MEM_SIZE (48U * 1024U)
+#define LV_MEM_ADR 0
+#define LV_MEM_POOL_INCLUDE <stdlib.h>
+#define LV_MEM_POOL_ALLOC malloc
 
 #define LV_TICK_CUSTOM 1
 #define LV_TICK_CUSTOM_INCLUDE "Arduino.h"
@@ -39,7 +40,7 @@
 #define LV_FONT_MONTSERRAT_28 1
 #define LV_FONT_DEFAULT &lv_font_montserrat_16
 
-#define LV_USE_PNG 1          /* print thumbnails from Moonraker (small ones: no PSRAM) */
+#define LV_USE_PNG 0          /* no print thumbnails on this board (no PSRAM) */
 
 #define LV_BUILD_EXAMPLES 0
 

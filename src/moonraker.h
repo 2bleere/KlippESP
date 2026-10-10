@@ -107,14 +107,7 @@ struct MrMeta {
     char slicer[32];
 };
 
-// Thumbnail PNG bytes. Ownership moves to the caller on mr_take_thumb() (free() with free()).
-struct MrThumb {
-    uint8_t* data;
-    size_t len;
-    uint16_t w, h;
-};
 
-enum { THUMB_DETAIL = 0, THUMB_PRINT = 1 };
 
 void mr_begin();
 void mr_reconfigure();  // after host/port/apikey changed
@@ -131,9 +124,8 @@ void mr_power_toggle(const char* device);
 // data requests (asynchronous)
 void mr_request_files();
 uint32_t mr_files(std::vector<MrFile>& out);  // returns version
-void mr_request_meta(const char* file);      // also fetches the detail thumbnail
+void mr_request_meta(const char* file);
 uint32_t mr_meta(MrMeta* out);
-bool mr_take_thumb(int slot, MrThumb* out);
 
 void mr_pause(bool on);  // stop all network activity (used during firmware updates)
 

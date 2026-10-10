@@ -83,5 +83,4 @@ void scr_system(lv_obj_t* p);
 
 bool is_printing();  // printing or paused
 
-// show the current print's thumbnail in img (scaled to fit box px); call periodically
-void ui_print_thumb(lv_obj_t* img, lv_coord_t box);
+
