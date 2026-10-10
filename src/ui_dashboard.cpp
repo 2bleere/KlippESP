@@ -129,7 +129,7 @@ static void make_gauge(Gauge& gg, lv_obj_t* scr, const Box& b, const char* icon,
     gg.max = max;
     gg.arc = make_arc(c, 100, 10, 135, 270);
     lv_obj_align(gg.arc, LV_ALIGN_LEFT_MID, 0, 0);
-    lv_arc_set_range(gg.arc, 0, max);
+    lv_arc_set_range(gg.arc, 0, 1000);  // fixed 0..1000 scale; update_gauge() maps temp/target onto it
     gg.icon = ui_label(gg.arc, icon, &icons_28, COL_DIM);
     lv_obj_center(gg.icon);
 
@@ -142,11 +142,13 @@ static void make_gauge(Gauge& gg, lv_obj_t* scr, const Box& b, const char* icon,
     gg.power = lv_bar_create(c);
     lv_obj_set_size(gg.power, inner - tx, 6);
     lv_obj_set_pos(gg.power, tx, 94);
-    lv_bar_set_range(gg.power, 0, 100);
-    set_bg_color(gg.power, COL_ORANGE, LV_PART_INDICATOR);
+    lv_bar_set_range(gg.power, 0, 1000);  // progress toward the target temperature
 }
 
+// While a heater is on, arc and bar show progress toward the target, measured from room temperature
+// (20 C empty -> target full). When it's off, the arc shows the temperature on the heater's fixed scale.
 static void update_gauge(Gauge& gg, const MrTemp& t, bool present) {
+    const float ROOM = 20;
     char buf[48];
     if (!present || !g.ready) {
         set_text(gg.temp, "--");
@@ -160,18 +162,27 @@ static void update_gauge(Gauge& gg, const MrTemp& t, bool present) {
     bool atTarget = on && fabsf(t.temp - t.target) < 3;
     // blue = cold, orange = heating (or still hot after switching off), green = at target
     lv_color_t col = atTarget ? COL_GREEN : (on || t.temp > 45) ? COL_ORANGE : COL_COLD;
-    lv_arc_set_value(gg.arc, (int)constrain(t.temp, 0, gg.max));
+
+    int scaled;
+    if (on) {
+        float span = t.target - ROOM;
+        float p = span > 1 ? (t.temp - ROOM) / span : 1;
+        scaled = atTarget ? 1000 : (int)constrain(p * 1000, 0, 1000);
+    } else {
+        scaled = (int)constrain(t.temp / gg.max * 1000, 0, 1000);
+    }
+    lv_arc_set_value(gg.arc, scaled);
     set_arc_color(gg.arc, col);
     set_text_color(gg.icon, col);
+    lv_bar_set_value(gg.power, on ? scaled : 0, LV_ANIM_OFF);
+    set_bg_color(gg.power, col, LV_PART_INDICATOR);
 
     snprintf(buf, sizeof(buf), "%.0f" DEG, t.temp);
     set_text(gg.temp, buf);
-    if (on) snprintf(buf, sizeof(buf), "%s  %s%.0f" DEG "   %.0f%%", atTarget ? ICON_OK : ICON_FIRE,
-                     L.portrait ? "target " : "", t.target, t.power * 100);
+    if (on) snprintf(buf, sizeof(buf), "%s  %s%.0f" DEG, atTarget ? ICON_OK : ICON_FIRE, L.portrait ? "target " : "", t.target);
     else snprintf(buf, sizeof(buf), "off");
     set_text(gg.target, buf);
     set_text_color(gg.target, on ? col : COL_DIM);
-    lv_bar_set_value(gg.power, (int)(t.power * 100), LV_ANIM_OFF);
 }
 
 static void make_tile(Tile& t, lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h,
