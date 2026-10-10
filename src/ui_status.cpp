@@ -4,6 +4,7 @@
 #include "ui.h"
 #include "ui_icons.h"
 #include "net.h"
+#include "clock.h"
 #include <vector>
 
 #define COL_COLD lv_color_hex(0x58a6ff)
@@ -324,7 +325,7 @@ void scr_home(lv_obj_t* p) {
 
 // ================================================================ PRINTING
 
-static lv_obj_t *pRing, *pIcon, *pPct, *pChip, *pName;
+static lv_obj_t *pRing, *pIcon, *pPct, *pChip, *pName, *pEta;
 static Gauge pExt, pBed;
 struct Tile {
     lv_obj_t *icon, *value;
@@ -402,6 +403,16 @@ static void printing_update() {
     update_gauge(pExt, g.ext, true);
     update_gauge(pBed, g.bed, g.hasBed);
 
+    // estimated finish time (wall clock) while a job runs
+    if (is_printing() && g.progress > 0.005f && clock_valid()) {
+        char hm[16];
+        clock_hm(hm, sizeof(hm), time(nullptr) + (time_t)(g.printDur / g.progress - g.printDur));
+        snprintf(buf, sizeof(buf), LV_SYMBOL_BELL " ETA %s", hm);
+        set_text(pEta, buf);
+    } else {
+        set_text(pEta, "");
+    }
+
     float remain = g.progress > 0.005f ? g.printDur / g.progress - g.printDur : 0;
     fmt_dur(a, sizeof(a), g.printDur);
     set_text(pTiles[0].value, a);
@@ -459,11 +470,14 @@ void scr_printing(lv_obj_t* p) {
     pName = ui_label(l, "", &lv_font_montserrat_12, COL_DIM);
     lv_label_set_long_mode(pName, LV_LABEL_LONG_DOT);
     lv_obj_set_size(pName, tw, P ? 46 : 30);
+    pEta = ui_label(l, "", &lv_font_montserrat_14, COL_ACCENT);
     if (P) {
         lv_obj_set_pos(pPct, 162, 12);
         lv_obj_set_pos(pChip, 162, 54);
         lv_obj_set_pos(pName, 162, 82);
+        lv_obj_set_pos(pEta, 162, 132);
     } else {
+        lv_obj_align(pEta, LV_ALIGN_TOP_MID, 0, 236);
         lv_obj_set_style_text_align(pChip, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_style_text_align(pName, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(pPct, LV_ALIGN_TOP_MID, 0, 146);

@@ -3,6 +3,7 @@
 #include "board.h"
 #include <WiFi.h>
 #include "net.h"
+#include "clock.h"
 #include "ui_icons.h"
 
 MrState g;
@@ -27,6 +28,7 @@ static lv_obj_t* btnHome;
 static lv_obj_t* lblExt;
 static lv_obj_t* lblBed;
 static lv_obj_t* lblWifi;
+static lv_obj_t* lblClock;
 
 static void (*upd)() = nullptr;
 static Scr cur = S_COUNT;
@@ -35,11 +37,11 @@ static int sp = 0;
 
 static const char* titles[S_COUNT] = {
     "KlippESP", "Print", "Printing", "Temperature", "Move", "Extrude", "Fans & Speed", "Macros",
-    "Console", "Power", "Settings", "Connection", "System", "Z Offset"};
+    "Console", "Power", "Settings", "Connection", "System", "Z Offset", "Date & Time"};
 
 static void (*builders[S_COUNT])(lv_obj_t*) = {
     scr_home, scr_files, scr_printing, scr_temp, scr_move, scr_extrude, scr_fans, scr_macros,
-    scr_console, scr_power, scr_settings, scr_connect, scr_system, scr_zoffset};
+    scr_console, scr_power, scr_settings, scr_connect, scr_system, scr_zoffset, scr_time};
 
 bool is_printing() { return !strcmp(g.pstate, "printing") || !strcmp(g.pstate, "paused"); }
 
@@ -416,10 +418,10 @@ static void build_topbar(lv_obj_t* scr) {
     lv_obj_set_style_pad_ver(lblTitle, 4, 0);
 
     // temps + wifi + E-STOP; tapping the temps opens the temperature screen
-    lv_obj_t* r = ui_row(bar, PORTRAIT ? 90 : 236, TOPBAR_H);
+    lv_obj_t* r = ui_row(bar, PORTRAIT ? 120 : 270, TOPBAR_H);
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(r, 8, 0);
+    lv_obj_set_style_pad_column(r, 6, 0);
     lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(r, temps_cb, LV_EVENT_CLICKED, nullptr);
 
@@ -429,8 +431,9 @@ static void build_topbar(lv_obj_t* scr) {
         lv_obj_add_flag(lblExt, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(lblBed, LV_OBJ_FLAG_HIDDEN);
     }
+    lblClock = ui_label(r, "", &lv_font_montserrat_14);
     lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_14);
-    lv_obj_t* es = ui_btn(r, "STOP", 52, 32, estop_cb, nullptr, COL_RED);
+    lv_obj_t* es = ui_btn(r, "STOP", 50, 32, estop_cb, nullptr, COL_RED);
     lv_obj_set_style_text_font(es, &lv_font_montserrat_14, 0);
 }
 
@@ -473,6 +476,9 @@ static void update_topbar() {
         set_text(lblBed, "");
     }
     set_text_color(lblWifi, g.wifi ? COL_GREEN : COL_RED);
+    char hm[16];
+    clock_hm(hm, sizeof(hm));
+    set_text(lblClock, clock_valid() ? hm : "");
 }
 
 // ---------------------------------------------------------------- screen sleep

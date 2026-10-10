@@ -16,6 +16,9 @@ void settings_load() {
     getStr(p, "pass", cfg.pass, sizeof(cfg.pass), "");
     getStr(p, "host", cfg.host, sizeof(cfg.host), "");
     getStr(p, "apikey", cfg.apikey, sizeof(cfg.apikey), "");
+    getStr(p, "ntp", cfg.ntp, sizeof(cfg.ntp), "pool.ntp.org");
+    getStr(p, "tz", cfg.tz, sizeof(cfg.tz), "UTC0");
+    cfg.clock24 = p.getBool("c24", true);
     cfg.port = p.getUShort("port", 7125);
     cfg.sleepMin = p.getUShort("sleep", 0);
     cfg.rotation = p.getUChar("rot", 0) & 3;
@@ -30,6 +33,9 @@ void settings_save() {
     p.putString("pass", cfg.pass);
     p.putString("host", cfg.host);
     p.putString("apikey", cfg.apikey);
+    p.putString("ntp", cfg.ntp);
+    p.putString("tz", cfg.tz);
+    p.putBool("c24", cfg.clock24);
     p.putUShort("port", cfg.port);
     p.putUShort("sleep", cfg.sleepMin);
     p.putUChar("rot", cfg.rotation);

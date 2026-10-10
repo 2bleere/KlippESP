@@ -7,11 +7,13 @@
 #include "moonraker.h"
 #include "ui.h"
 #include "net.h"
+#include "clock.h"
 #include "ui_icons.h"
 
 void setup() {
     Serial.begin(115200);
     settings_load();
+    clock_begin();  // timezone, so file dates are local even before NTP syncs
 
     net_begin();
 

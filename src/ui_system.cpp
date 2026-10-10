@@ -1,6 +1,8 @@
 // Console, settings menu, connection (WiFi + printer address) and system screens.
 #include "ui.h"
 #include "board.h"
+#include "clock.h"
+#include "ui_icons.h"
 #include <WiFi.h>
 
 #define FW_VERSION "1.0.0"
@@ -119,7 +121,7 @@ static void goto_cb(lv_event_t* e) { ui_goto((Scr)(intptr_t)lv_event_get_user_da
 void scr_settings(lv_obj_t* p) {
     lv_obj_t* g2 = lv_obj_create(p);
     lv_obj_set_pos(g2, 6, 6);
-    lv_obj_set_size(g2, CONTENT_W - 12, PORTRAIT ? 236 : 120);
+    lv_obj_set_size(g2, CONTENT_W - 12, PORTRAIT ? 350 : 236);
     lv_obj_set_style_bg_opa(g2, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(g2, 0, 0);
     lv_obj_set_style_pad_all(g2, 0, 0);
@@ -132,6 +134,7 @@ void scr_settings(lv_obj_t* p) {
     ui_tile(g2, LV_SYMBOL_SETTINGS, "System", w, 110, goto_cb, (void*)(intptr_t)S_SYSTEM);
     ui_tile(g2, LV_SYMBOL_POWER, "Power devices", w, 110, goto_cb, (void*)(intptr_t)S_POWER);
     ui_tile(g2, LV_SYMBOL_KEYBOARD, "Console", w, 110, goto_cb, (void*)(intptr_t)S_CONSOLE);
+    ui_tile(g2, ICON_CLOCK, "Date & Time", w, 110, goto_cb, (void*)(intptr_t)S_TIME);
 }
 
 // ================================================================ CONNECTION
@@ -373,8 +376,10 @@ static void system_update() {
                  (unsigned)(h.memUsed / 1024), (unsigned)(h.memTotal / 1024), h.diskUsed / 1e9, h.diskTotal / 1e9,
                  h.throttled ? "\n" LV_SYMBOL_WARNING " " : "", h.throttled ? h.flags : "");
     }
-    snprintf(buf, sizeof(buf), "KlippESP %s\nIP %s  %d dBm\nPrinter %s:%u\nKlipper %s\nFree heap %u KB%s",
-             FW_VERSION, WiFi.localIP().toString().c_str(), WiFi.RSSI(), cfg.host, cfg.port,
+    char now[32];
+    if (!clock_datetime(now, sizeof(now))) strlcpy(now, "not synced", sizeof(now));
+    snprintf(buf, sizeof(buf), "KlippESP %s\n%s\nIP %s  %d dBm\nPrinter %s:%u\nKlipper %s\nFree heap %u KB%s",
+             FW_VERSION, now, WiFi.localIP().toString().c_str(), WiFi.RSSI(), cfg.host, cfg.port,
              g.online ? g.klippy : "offline", (unsigned)(ESP.getFreeHeap() / 1024), host);
     set_text(sysInfo, buf);
 }
@@ -464,4 +469,122 @@ void scr_system(lv_obj_t* p) {
     act(LV_SYMBOL_POWER " Shutdown Host", shutdown_host_cb, nullptr, COL_RED);
     act("Restart Display", reboot_self_cb, nullptr, COL_BTN);
     ui_set_update(system_update);
+}
+
+// ================================================================ DATE & TIME
+
+static lv_obj_t *tmClock, *tmDate, *tmStatus, *tmNtp, *tmKb, *tmZone, *tm24;
+
+static void time_kb_evt(lv_event_t* e) {
+    lv_event_code_t c = lv_event_get_code(e);
+    if (c == LV_EVENT_READY) {
+        String n = lv_textarea_get_text(tmNtp);
+        n.trim();
+        strlcpy(cfg.ntp, n.length() ? n.c_str() : "pool.ntp.org", sizeof(cfg.ntp));
+        settings_save();
+        clock_apply();
+        ui_toast("NTP server saved, syncing...");
+    }
+    if (c == LV_EVENT_READY || c == LV_EVENT_CANCEL) {
+        lv_obj_add_flag(tmKb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_state(tmNtp, LV_STATE_FOCUSED);
+    }
+}
+
+static void time_ta_evt(lv_event_t* e) {
+    lv_event_code_t c = lv_event_get_code(e);
+    if (c == LV_EVENT_FOCUSED || c == LV_EVENT_CLICKED) {
+        lv_keyboard_set_textarea(tmKb, tmNtp);
+        lv_obj_clear_flag(tmKb, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(tmKb);
+    }
+}
+
+static void zone_cb(lv_event_t* e) {
+    uint16_t i = lv_dropdown_get_selected(lv_event_get_target(e));
+    if (i >= TZ_ZONE_COUNT) return;  // "Custom" (set on the web page) keeps its rule
+    strlcpy(cfg.tz, TZ_ZONES[i].posix, sizeof(cfg.tz));
+    settings_save();
+    clock_apply();
+}
+
+static void c24_cb(lv_event_t* e) {
+    cfg.clock24 = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    settings_save();
+}
+
+static void sync_cb(lv_event_t*) {
+    clock_apply();
+    ui_toast("Syncing time...");
+}
+
+static void time_update() {
+    char buf[64];
+    if (clock_valid()) {
+        time_t t = time(nullptr);
+        struct tm tmv;
+        localtime_r(&t, &tmv);
+        strftime(buf, sizeof(buf), cfg.clock24 ? "%H:%M:%S" : "%l:%M:%S %p", &tmv);
+        set_text(tmClock, buf[0] == ' ' ? buf + 1 : buf);
+        strftime(buf, sizeof(buf), "%A, %d %B %Y", &tmv);
+        set_text(tmDate, buf);
+        snprintf(buf, sizeof(buf), LV_SYMBOL_OK " Synced with %s", cfg.ntp);
+        set_text(tmStatus, buf);
+        set_text_color(tmStatus, COL_GREEN);
+    } else {
+        set_text(tmClock, "--:--");
+        set_text(tmDate, "");
+        snprintf(buf, sizeof(buf), g.wifi ? "Waiting for %s..." : "No Wi-Fi - can't sync", cfg.ntp);
+        set_text(tmStatus, buf);
+        set_text_color(tmStatus, COL_ORANGE);
+    }
+}
+
+void scr_time(lv_obj_t* p) {
+    const bool P = PORTRAIT;
+    // everything typed (NTP server) sits above the keyboard; the zone dropdown may sit below it
+    const lv_coord_t cw = P ? CONTENT_W - 12 : 230;
+    lv_obj_t* c = ui_card(p, 6, 6, cw, P ? 96 : 118);
+    tmClock = ui_label(c, "", &lv_font_montserrat_28);
+    tmDate = ui_label(c, "", &lv_font_montserrat_14, COL_DIM);
+    lv_obj_set_pos(tmDate, 0, 36);
+    tmStatus = ui_label(c, "", &lv_font_montserrat_12, COL_DIM);
+    lv_label_set_long_mode(tmStatus, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(tmStatus, cw - 16);
+    lv_obj_set_pos(tmStatus, 0, P ? 60 : 62);
+
+    const lv_coord_t nx = P ? 6 : 244, ny = P ? 108 : 2, nw = P ? CONTENT_W - 12 : 230;
+    lv_obj_t* nl = ui_label(p, "NTP server", &lv_font_montserrat_12, COL_DIM);
+    lv_obj_set_pos(nl, nx + 2, ny);
+    tmNtp = make_ta(p, "pool.ntp.org", cfg.ntp, nw);
+    lv_obj_set_pos(tmNtp, nx, ny + 18);
+    lv_obj_add_event_cb(tmNtp, time_ta_evt, LV_EVENT_ALL, nullptr);
+    lv_obj_t* r = ui_row(p, nw, 36);
+    lv_obj_set_pos(r, nx, ny + 60);
+    lv_obj_t* sb = ui_btn(r, LV_SYMBOL_REFRESH " Sync now", 116, 34, sync_cb, nullptr, COL_ACCENT);
+    lv_obj_set_style_text_font(sb, &lv_font_montserrat_14, 0);
+    ui_label(r, "24 h", &lv_font_montserrat_14, COL_DIM);
+    tm24 = lv_switch_create(r);
+    lv_obj_set_size(tm24, 50, 26);
+    if (cfg.clock24) lv_obj_add_state(tm24, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(tm24, c24_cb, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    const lv_coord_t zy = P ? 214 : 130;
+    lv_obj_t* zc = ui_card(p, 6, zy, CONTENT_W - 12, P ? 96 : 84);
+    ui_label(zc, "Time zone", &lv_font_montserrat_12, COL_DIM);
+    tmZone = lv_dropdown_create(zc);
+    String opts;
+    for (int i = 0; i < TZ_ZONE_COUNT; i++) opts += String(i ? "\n" : "") + TZ_ZONES[i].name;
+    int zi = clock_zone_index();
+    if (zi < 0) opts += String("\nCustom: ") + cfg.tz;
+    lv_dropdown_set_options(tmZone, opts.c_str());
+    lv_dropdown_set_selected(tmZone, zi >= 0 ? zi : TZ_ZONE_COUNT);
+    lv_obj_set_style_text_font(tmZone, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_max_height(lv_dropdown_get_list(tmZone), 200, 0);
+    lv_obj_set_size(tmZone, CONTENT_W - 28, 38);
+    lv_obj_set_pos(tmZone, 0, 18);
+    lv_obj_add_event_cb(tmZone, zone_cb, LV_EVENT_VALUE_CHANGED, nullptr);
+
+    tmKb = make_kb(p, time_kb_evt);
+    ui_set_update(time_update);
 }

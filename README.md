@@ -18,6 +18,9 @@
 - When the printer is unavailable (no Wi-Fi, Moonraker offline, Klipper down) Home shows a status card with only
   Settings and Power (plus Restart / FW restart while Klipper is down)
 - Brightness: Settings → System slider, or the settings web page
+- Date & time: NTP client (configurable server, default `pool.ntp.org`), time zone list with automatic DST (or a custom
+  POSIX rule on the web page), 12/24 h. Set on the display (Settings → Date & Time) or the web page. Shown as a clock in
+  the top bar, the print ETA, "done ~" time in file details, local file dates and on the System screen
 - No PSRAM: no print thumbnails (a hotend icon sits in the progress ring); about 118 KB RAM stays free
 - During firmware updates the screen shows a real progress bar (the ST7796 keeps its own frame memory)
 
