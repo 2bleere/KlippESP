@@ -384,11 +384,10 @@ void scr_printing(lv_obj_t* p) {
     lv_obj_set_style_border_width(box, 0, 0);
     lv_obj_set_style_pad_all(box, 0, 0);
     lv_obj_set_style_radius(box, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_clip_corner(box, true, 0);
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_center(box);
-    pIcon = ui_label(box, ICON_NOZZLE, &icons_28, COL_DIM);
-    lv_obj_set_style_transform_zoom(pIcon, 512, 0);  // 2x: ~56 px hotend
+    // native 56 px glyph: LVGL transforms (zoom) need an off-screen layer that the small pool can't provide
+    pIcon = ui_label(box, ICON_NOZZLE, &icons_56, COL_DIM);
     lv_obj_center(pIcon);
 
     pPct = ui_label(l, "", &lv_font_montserrat_28);

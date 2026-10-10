@@ -4,6 +4,7 @@
 #include <lvgl.h>
 
 extern lv_font_t icons_20, icons_28;
+extern const lv_font_t icons_56;
 void ui_icons_init();
 
 #define ICON_NOZZLE        "\xF3\xB0\xB9\x9B"
