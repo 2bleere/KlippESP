@@ -138,7 +138,7 @@ static void goto_cb(lv_event_t* e) { ui_goto((Scr)(intptr_t)lv_event_get_user_da
 
 static Gauge hExt, hBed;
 static lv_obj_t* hPrintTile;
-#define HOME_SLOTS 6
+#define HOME_SLOTS 8  // 2 columns x 4 rows; the last host rows are reserved
 static lv_obj_t *hSlotName[HOME_SLOTS], *hSlotVal[HOME_SLOTS];
 static lv_coord_t hSlotNameW;
 static lv_obj_t *hOnline[3];                        // gauges + list, hidden while the printer is unavailable
@@ -226,23 +226,44 @@ static void home_update() {
         set_text_color(hSlotVal[i], col);
         i++;
     };
-    for (int k = 0; k < g.nExtra; k++) {
+    // host (Raspberry Pi etc.) CPU temperature / load / RAM always get their rows at the end
+    const MrHost& h = g.host;
+    bool hostTemp = h.valid && !isnan(h.cpuTemp);
+    int nHost = h.valid ? 2 + (hostTemp ? 1 : 0) : 0;
+    const char* hp = strcasestr(h.model, "raspberry") ? "Pi" : "Host";
+    for (int k = 0; k < g.nExtra && i < HOME_SLOTS - nHost; k++) {
+        const char* lb = g.extra[k].label;
+        bool isHostSensor = strcasestr(lb, "pi") || strcasestr(lb, "host") || strcasestr(lb, "rpi");
+        if (hostTemp && isHostSensor && !g.extra[k].settable) continue;  // same value as the host row below
         snprintf(val, sizeof(val), "%.0f" DEG, g.extra[k].temp);
-        put(g.extra[k].label, val, g.extra[k].settable && g.extra[k].target > 0 ? COL_ORANGE : COL_TEXT, false);
+        put(lb, val, g.extra[k].settable && g.extra[k].target > 0 ? COL_ORANGE : COL_TEXT, false);
     }
-    for (int k = 0; k < g.nFans; k++) {
+    for (int k = 0; k < g.nFans && i < HOME_SLOTS - nHost; k++) {
         char lbl[40];
         snprintf(lbl, sizeof(lbl), "%s%s", g.fans[k].label, strcasestr(g.fans[k].label, "fan") ? "" : " fan");
         if (g.fans[k].speed > 0) snprintf(val, sizeof(val), "%.0f%%", g.fans[k].speed * 100);
         else snprintf(val, sizeof(val), "off");
         put(lbl, val, g.fans[k].speed > 0 ? COL_ACCENT : COL_DIM, true);
     }
-    if (g.host.valid) {
-        snprintf(val, sizeof(val), "%.0f%%", g.host.cpu);
-        put("CPU", val, load_color(g.host.cpu), false);
-        float mp = pct(g.host.memUsed, g.host.memTotal);
+    while (nHost && i < HOME_SLOTS - nHost) {  // keep the host rows in the same place (end of column 2)
+        set_text(hSlotName[i], "");
+        set_text(hSlotVal[i], "");
+        i++;
+    }
+    if (h.valid) {
+        char lbl[16];
+        if (hostTemp) {
+            snprintf(lbl, sizeof(lbl), "%s temp", hp);
+            snprintf(val, sizeof(val), "%.0f" DEG, h.cpuTemp);
+            put(lbl, val, h.cpuTemp < 60 ? COL_GREEN : h.cpuTemp < 75 ? COL_ORANGE : COL_RED, false);
+        }
+        snprintf(lbl, sizeof(lbl), "%s CPU", hp);
+        snprintf(val, sizeof(val), "%.0f%%", h.cpu);
+        put(lbl, val, load_color(h.cpu), false);
+        float mp = pct(h.memUsed, h.memTotal);
+        snprintf(lbl, sizeof(lbl), "%s RAM", hp);
         snprintf(val, sizeof(val), "%.0f%%", mp);
-        put("Memory", val, load_color(mp), false);
+        put(lbl, val, load_color(mp), false);
     }
     for (; i < HOME_SLOTS; i++) {
         set_text(hSlotName[i], "");
@@ -264,7 +285,7 @@ void scr_home(lv_obj_t* p) {
     lv_coord_t colW = (pw - 16) / 2;
     hSlotNameW = colW - 46;
     for (int k = 0; k < HOME_SLOTS; k++) {
-        lv_coord_t x = (k / 3) * colW, y = (k % 3) * 24;  // column by column
+        lv_coord_t x = (k / 4) * colW, y = (k % 4) * (PORTRAIT ? 18 : 19);  // column by column
         hSlotName[k] = ui_label(lc, "", &lv_font_montserrat_12, COL_DIM);
         lv_obj_set_pos(hSlotName[k], x, y);
         hSlotVal[k] = ui_label(lc, "", &lv_font_montserrat_14);
