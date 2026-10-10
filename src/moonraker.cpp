@@ -524,14 +524,18 @@ static void doFiles() {
     filesVer++;
 }
 
+// No PSRAM on this board: use the slicer's small thumbnail (decoded RGB is w*h*3 bytes in internal RAM).
+#define THUMB_MAX_W 120
+#define THUMB_MAX_BYTES 60000
+
 static void doThumb(const char* file, JsonArray thumbsArr, int slot) {
-    // pick the largest thumbnail no wider than 300 px (else the smallest)
+    // pick the largest thumbnail no wider than THUMB_MAX_W (else the smallest)
     JsonObject best;
     int bestW = 0, smallW = 99999;
     JsonObject small;
     for (JsonObject t : thumbsArr) {
         int w = t["width"] | 0;
-        if (w <= 300 && w > bestW) { best = t; bestW = w; }
+        if (w <= THUMB_MAX_W && w > bestW) { best = t; bestW = w; }
         if (w < smallW) { small = t; smallW = w; }
     }
     if (best.isNull()) best = small;
@@ -552,8 +556,8 @@ static void doThumb(const char* file, JsonArray thumbsArr, int slot) {
     if (cfg.apikey[0]) h.addHeader("X-Api-Key", cfg.apikey);
     int code = h.GET();
     int len = h.getSize();
-    if (code != 200 || len <= 24 || len > 400000) { h.end(); return; }
-    uint8_t* buf = (uint8_t*)ps_malloc(len);
+    if (code != 200 || len <= 24 || len > THUMB_MAX_BYTES) { h.end(); return; }
+    uint8_t* buf = (uint8_t*)malloc(len);
     if (!buf) { h.end(); return; }
     WiFiClient* s = h.getStreamPtr();
     int got = 0;

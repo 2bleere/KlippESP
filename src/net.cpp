@@ -2,6 +2,7 @@
 #include "settings.h"
 #include "moonraker.h"
 #include "ui.h"
+#include "board.h"
 #include "web_logo.h"
 #include <WiFi.h>
 #include <WebServer.h>
@@ -19,10 +20,7 @@ static uint32_t lastConnected = 0;  // last time the STA link was up (or a conne
 #define AP_FALLBACK_MS 60000   // start the setup hotspot after this long without Wi-Fi
 #define STA_RETRY_MS 15000     // nudge reconnects while disconnected (auto-reconnect can give up)
 
-static void logln(const String& s) {
-    Serial.println(s);
-    Serial0.println(s);
-}
+static void logln(const String& s) { Serial.println(s); }
 
 static void log_status(const char* tag) {
     char b[200];
@@ -158,11 +156,11 @@ static void handle_root() {
     h += "<label>Printer IP or hostname</label><input name=host value=\"" + esc(cfg.host) + "\" placeholder='192.168.1.50'>";
     h += "<label>Moonraker port</label><input name=port type=number value=\"" + String(cfg.port) + "\">";
     h += F("<label>API key (optional)</label><input name=apikey type=password placeholder='(unchanged)'>");
-    static const char* rots[] = {"Landscape", "Portrait", "Landscape (upside down)", "Portrait (upside down)"};
     h += F("<label>Display orientation</label><select name=rot>");
-    for (int i = 0; i < 4; i++)
-        h += "<option value=" + String(i) + (cfg.rotation == i ? " selected>" : ">") + rots[i] + "</option>";
-    h += F("</select><small>Portrait applies to the status dashboard (no-touch mode). Changing it restarts the display.</small>");
+    h += String("<option value=0") + (cfg.rotation == 0 ? " selected" : "") + ">Landscape</option>";
+    h += String("<option value=2") + (cfg.rotation == 2 ? " selected" : "") + ">Landscape (upside down)</option>";
+    h += F("</select><small>Changing it restarts the display.</small>");
+    h += "<label>Brightness</label><input type=range name=bri min=10 max=255 value=" + String(cfg.brightness) + ">";
     h += F("<button>Save &amp; connect</button></form>"
            "<h3 style='margin-top:32px'>Firmware update</h3><form method=post action=/update enctype=multipart/form-data "
            "onsubmit=\"this.querySelector('button').textContent='Uploading\u2026 (about 30 s)';\">"
@@ -194,9 +192,13 @@ static void handle_save() {
     int port = server.arg("port").toInt();
     cfg.port = port > 0 && port < 65536 ? port : 7125;
     if (server.arg("apikey").length()) strlcpy(cfg.apikey, server.arg("apikey").c_str(), sizeof(cfg.apikey));
+    if (server.hasArg("bri")) {
+        cfg.brightness = constrain(server.arg("bri").toInt(), 10, 255);
+        board_set_brightness(cfg.brightness);
+    }
     bool rotChanged = false;
     if (server.hasArg("rot")) {
-        uint8_t r = server.arg("rot").toInt() & 3;
+        uint8_t r = server.arg("rot").toInt() & 2;
         rotChanged = r != cfg.rotation;
         cfg.rotation = r;
     }
@@ -236,7 +238,8 @@ static void serial_cmd(String line) {
     else if (k == "host") strlcpy(cfg.host, v.c_str(), sizeof(cfg.host));
     else if (k == "port") cfg.port = v.toInt() > 0 ? v.toInt() : 7125;
     else if (k == "apikey") strlcpy(cfg.apikey, v.c_str(), sizeof(cfg.apikey));
-    else if (k == "rotate") cfg.rotation = v.toInt() & 3;  // takes effect after save + restart
+    else if (k == "rotate") cfg.rotation = v.toInt() & 2;  // 0 or 2; takes effect after save + restart
+    else if (k == "bri") board_set_brightness(cfg.brightness = constrain(v.toInt(), 10, 255));
     else if (k == "save") {
         settings_save();
         mr_reconfigure();
@@ -247,7 +250,7 @@ static void serial_cmd(String line) {
         log_status("status");
         return;
     } else if (k != "show") {
-        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 save show status");
+        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0|2 bri=10..255 save show status");
         return;
     }
     Serial.printf("OK ssid='%s' pass=%s host='%s' port=%u apikey=%s wifi=%s ip=%s\n", cfg.ssid,
@@ -359,9 +362,8 @@ void net_begin() {
 }
 
 void net_loop() {
-    static String bufUsb, bufUart;
-    poll_serial(Serial, bufUsb);
-    poll_serial(Serial0, bufUart);
+    static String bufSerial;
+    poll_serial(Serial, bufSerial);
     if (apActive) dns.processNextRequest();
     server.handleClient();
     static bool otaStarted = false;

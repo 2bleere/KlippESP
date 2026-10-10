@@ -7,13 +7,17 @@
 
 MrState g;
 
+void ui_icons_init() {
+    icons_20.fallback = &lv_font_montserrat_20;
+    icons_28.fallback = &lv_font_montserrat_28;
+}
+
 static lv_obj_t* content;
 static lv_obj_t* lblTitle;
 static lv_obj_t* btnBack;
 static lv_obj_t* btnHome;
 static lv_obj_t* lblExt;
 static lv_obj_t* lblBed;
-static lv_obj_t* lblState;
 static lv_obj_t* lblWifi;
 
 static void (*upd)() = nullptr;
@@ -60,9 +64,9 @@ lv_obj_t* ui_btn(lv_obj_t* parent, const char* txt, lv_coord_t w, lv_coord_t h, 
     lv_obj_t* b = lv_btn_create(parent);
     lv_obj_set_size(b, w, h);
     lv_obj_set_style_bg_color(b, col, 0);
-    lv_obj_set_style_radius(b, 10, 0);
+    lv_obj_set_style_radius(b, 8, 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
-    lv_obj_set_style_pad_all(b, 4, 0);
+    lv_obj_set_style_pad_all(b, 2, 0);
     lv_obj_t* l = lv_label_create(b);
     lv_label_set_text(l, txt);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
@@ -79,13 +83,14 @@ lv_obj_t* ui_tile(lv_obj_t* parent, const char* icon, const char* txt, lv_coord_
     lv_obj_t* b = lv_btn_create(parent);
     lv_obj_set_size(b, w, h);
     set_bg_color(b, col, 0);
-    lv_obj_set_style_radius(b, 14, 0);
+    lv_obj_set_style_radius(b, 10, 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
+    lv_obj_set_style_pad_all(b, 2, 0);
     lv_obj_set_flex_flow(b, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(b, 8, 0);
-    ui_label(b, icon, &lv_font_montserrat_32);
-    lv_obj_t* l = ui_label(b, txt, &lv_font_montserrat_20);
+    lv_obj_set_style_pad_row(b, 4, 0);
+    ui_label(b, icon, &icons_28);
+    lv_obj_t* l = ui_label(b, txt, &lv_font_montserrat_14);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, ud);
     return b;
@@ -97,8 +102,8 @@ lv_obj_t* ui_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv
     lv_obj_set_size(c, w, h);
     lv_obj_set_style_bg_color(c, COL_CARD, 0);
     lv_obj_set_style_border_width(c, 0, 0);
-    lv_obj_set_style_radius(c, 12, 0);
-    lv_obj_set_style_pad_all(c, 10, 0);
+    lv_obj_set_style_radius(c, 10, 0);
+    lv_obj_set_style_pad_all(c, 8, 0);
     lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
     return c;
 }
@@ -109,7 +114,7 @@ lv_obj_t* ui_row(lv_obj_t* parent, lv_coord_t w, lv_coord_t h) {
     lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(r, 0, 0);
     lv_obj_set_style_pad_all(r, 0, 0);
-    lv_obj_set_style_pad_column(r, 8, 0);
+    lv_obj_set_style_pad_column(r, 6, 0);
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
@@ -150,42 +155,42 @@ void set_height(lv_obj_t* o, lv_coord_t h) {
 // ---------------------------------------------------------------- firmware update overlay
 
 void ui_ota_progress(int pct) {
-    // Flash writes during an update starve the panel's PSRAM frame buffer and make any image flicker, and
-    // this panel blanks as soon as its refresh stops. So: show a message for a few seconds (before any
-    // flash is written), then stop the refresh and switch the backlight off until the display restarts.
-    static bool dark = false;
-    if (pct <= -100) {  // update failed: restart to bring the screen back (old firmware)
-        delay(200);
-        ESP.restart();
+    // The ST7796 keeps its own frame memory, so flash writes don't disturb the image: show real progress.
+    static lv_obj_t *ov, *bar, *lbl;
+    static int last = -2;
+    if (pct <= -100) {  // update failed
+        if (ov) lv_obj_del(ov);
+        ov = nullptr;
+        last = -2;
+        return;
     }
-    if (dark) return;
-    dark = true;
-
-    lv_obj_t* ov = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(ov, lv_disp_get_hor_res(nullptr), lv_disp_get_ver_res(nullptr));
-    lv_obj_set_style_bg_color(ov, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(ov, 0, 0);
-    lv_obj_set_style_radius(ov, 0, 0);
-    lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
-    // wrap within the screen width so the text also fits in portrait (480 px)
-    lv_coord_t tw = lv_disp_get_hor_res(nullptr) - 48;
-    lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_32, COL_TEXT);
-    lv_label_set_long_mode(t, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(t, tw);
-    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(t, LV_ALIGN_CENTER, 0, -50);
-    lv_obj_t* s = ui_label(ov, "The screen turns off during the update and comes back when the display restarts. "
-                               "Do not unplug.", &lv_font_montserrat_20, COL_DIM);
-    lv_label_set_long_mode(s, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(s, LV_MIN(tw, 560));
-    lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_update_layout(ov);  // wrapped label heights are needed before stacking the subtitle
-    lv_obj_align_to(s, t, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-    lv_refr_now(nullptr);
-    delay(4000);  // readable pause; no flash has been written yet
-    board_backlight(false);
-    board_lcd_freeze();
+    if (!ov) {
+        ov = lv_obj_create(lv_layer_top());
+        lv_obj_set_size(ov, LCD_W, LCD_H);
+        lv_obj_set_style_bg_color(ov, COL_BG, 0);
+        lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(ov, 0, 0);
+        lv_obj_set_style_radius(ov, 0, 0);
+        lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_20, COL_TEXT);
+        lv_obj_align(t, LV_ALIGN_CENTER, 0, -50);
+        lv_obj_t* s = ui_label(ov, "Do not unplug. The display restarts when done.", &lv_font_montserrat_14, COL_DIM);
+        lv_obj_align(s, LV_ALIGN_CENTER, 0, -20);
+        bar = lv_bar_create(ov);
+        lv_obj_set_size(bar, 360, 14);
+        lv_obj_align(bar, LV_ALIGN_CENTER, 0, 18);
+        lv_bar_set_range(bar, 0, 100);
+        lbl = ui_label(ov, "", &lv_font_montserrat_20, COL_TEXT);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 52);
+    }
+    if (pct >= 0 && pct < 100 && last >= 0 && pct - last < 2) return;
+    if (pct == last) return;
+    last = pct;
+    char buf[16];
+    snprintf(buf, sizeof(buf), pct < 0 ? "Starting..." : "%d%%", pct);
+    lv_label_set_text(lbl, buf);
+    lv_bar_set_value(bar, pct < 0 ? 0 : pct, LV_ANIM_OFF);
+    lv_refr_now(nullptr);  // the main loop is busy receiving firmware
 }
 
 // ---------------------------------------------------------------- toast
@@ -210,14 +215,15 @@ static void toast_click(lv_event_t*) {
 void ui_toast(const char* msg, bool error) {
     if (!toast) {
         toast = lv_label_create(lv_layer_top());
-        lv_obj_set_width(toast, LV_MIN(640, lv_disp_get_hor_res(nullptr) - 32));
+        lv_obj_set_width(toast, LCD_W - 40);
         lv_label_set_long_mode(toast, LV_LABEL_LONG_WRAP);
-        lv_obj_set_style_pad_all(toast, 12, 0);
+        lv_obj_set_style_text_font(toast, &lv_font_montserrat_14, 0);
+        lv_obj_set_style_pad_all(toast, 10, 0);
         lv_obj_set_style_radius(toast, 10, 0);
         lv_obj_set_style_bg_opa(toast, LV_OPA_90, 0);
         lv_obj_set_style_text_color(toast, COL_TEXT, 0);
         lv_obj_set_style_text_align(toast, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -16);
+        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -10);
         lv_obj_add_flag(toast, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(toast, toast_click, LV_EVENT_CLICKED, nullptr);
     }
@@ -250,12 +256,13 @@ static void confirm_evt(lv_event_t* e) {
 void ui_confirm(const char* title, const char* text, void (*cb)(void*), void* ud) {
     static const char* btns[] = {"Cancel", "OK", ""};
     lv_obj_t* mb = lv_msgbox_create(nullptr, title, text, btns, false);
-    lv_obj_set_width(mb, 520);
+    lv_obj_set_width(mb, 380);
+    lv_obj_set_style_text_font(mb, &lv_font_montserrat_14, 0);
     lv_obj_center(mb);
     lv_obj_t* bm = lv_msgbox_get_btns(mb);
-    lv_obj_set_height(bm, 64);
+    lv_obj_set_height(bm, 46);
     lv_btnmatrix_set_btn_ctrl_all(bm, LV_BTNMATRIX_CTRL_CLICK_TRIG);
-    lv_obj_set_style_min_width(bm, 360, 0);
+    lv_obj_set_style_min_width(bm, 300, 0);
     lv_obj_add_event_cb(mb, confirm_evt, LV_EVENT_VALUE_CHANGED, new ConfirmCtx{cb, ud});
 }
 
@@ -295,28 +302,29 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
     lv_obj_set_style_border_width(npOverlay, 0, 0);
     lv_obj_set_style_radius(npOverlay, 0, 0);
 
-    lv_obj_t* c = ui_card(npOverlay, 0, 0, 400, 460);
+    lv_obj_t* c = ui_card(npOverlay, 0, 0, 440, 300);
     lv_obj_center(c);
-    lv_obj_t* l = ui_label(c, title, &lv_font_montserrat_20);
-    lv_obj_align(l, LV_ALIGN_TOP_MID, 0, 0);
+    lv_obj_t* l = ui_label(c, title, &lv_font_montserrat_16);
+    lv_obj_set_pos(l, 0, 0);
 
     npTa = lv_textarea_create(c);
     lv_textarea_set_one_line(npTa, true);
     lv_textarea_set_accepted_chars(npTa, "0123456789.-");
     lv_obj_set_style_text_font(npTa, &lv_font_montserrat_28, 0);
-    lv_obj_set_size(npTa, 370, 56);
-    lv_obj_align(npTa, LV_ALIGN_TOP_MID, 0, 30);
+    lv_obj_set_size(npTa, 150, 54);
+    lv_obj_set_pos(npTa, 0, 30);
     char buf[16];
     snprintf(buf, sizeof(buf), "%g", initial);
     lv_textarea_set_text(npTa, buf);
 
     lv_obj_t* bm = lv_btnmatrix_create(c);
     lv_btnmatrix_set_map(bm, map);
-    lv_obj_set_size(bm, 380, 340);
-    lv_obj_align(bm, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_set_size(bm, 262, 284);
+    lv_obj_align(bm, LV_ALIGN_RIGHT_MID, 6, 0);
     lv_obj_set_style_bg_opa(bm, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(bm, 0, 0);
-    lv_obj_set_style_text_font(bm, &lv_font_montserrat_24, LV_PART_ITEMS);
+    lv_obj_set_style_pad_all(bm, 2, 0);
+    lv_obj_set_style_text_font(bm, &lv_font_montserrat_20, LV_PART_ITEMS);
     lv_obj_add_event_cb(bm, np_evt, LV_EVENT_VALUE_CHANGED, nullptr);
 }
 
@@ -334,11 +342,11 @@ static void build(Scr s) {
     if (s == S_HOME) {
         lv_obj_add_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(lblTitle, 16);
+        lv_obj_set_x(lblTitle, 10);
     } else {
         lv_obj_clear_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_x(lblTitle, 140);
+        lv_obj_set_x(lblTitle, 98);
     }
     builders[s](content);
     if (upd) upd();
@@ -370,7 +378,7 @@ static void temps_cb(lv_event_t*) { ui_goto(S_TEMP); }
 
 static void build_topbar(lv_obj_t* scr) {
     lv_obj_t* bar = lv_obj_create(scr);
-    lv_obj_set_size(bar, LCD_W, 56);
+    lv_obj_set_size(bar, LCD_W, TOPBAR_H);
     lv_obj_set_pos(bar, 0, 0);
     lv_obj_set_style_bg_color(bar, COL_BAR, 0);
     lv_obj_set_style_radius(bar, 0, 0);
@@ -378,42 +386,40 @@ static void build_topbar(lv_obj_t* scr) {
     lv_obj_set_style_pad_all(bar, 0, 0);
     lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
 
-    btnBack = ui_btn(bar, LV_SYMBOL_LEFT, 60, 44, back_cb);
-    lv_obj_set_pos(btnBack, 6, 6);
-    btnHome = ui_btn(bar, LV_SYMBOL_HOME, 60, 44, home_cb);
-    lv_obj_set_pos(btnHome, 72, 6);
+    btnBack = ui_btn(bar, LV_SYMBOL_LEFT, 42, 32, back_cb);
+    lv_obj_set_pos(btnBack, 4, 4);
+    btnHome = ui_btn(bar, LV_SYMBOL_HOME, 42, 32, home_cb);
+    lv_obj_set_pos(btnHome, 50, 4);
 
-    lblTitle = ui_label(bar, "", &lv_font_montserrat_20);
-    lv_obj_set_pos(lblTitle, 140, 17);
+    lblTitle = ui_label(bar, "", &lv_font_montserrat_16);
+    lv_obj_set_pos(lblTitle, 98, 11);
 
-    lv_obj_t* r = ui_row(bar, 430, 56);
-    lv_obj_align(r, LV_ALIGN_RIGHT_MID, -6, 0);
+    // temps + wifi + E-STOP; tapping the temps opens the temperature screen
+    lv_obj_t* r = ui_row(bar, 236, TOPBAR_H);
+    lv_obj_align(r, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(r, 12, 0);
+    lv_obj_set_style_pad_column(r, 8, 0);
     lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(r, temps_cb, LV_EVENT_CLICKED, nullptr);
 
-    lblExt = ui_label(r, "", &lv_font_montserrat_16);
-    lblBed = ui_label(r, "", &lv_font_montserrat_16);
-    lblState = ui_label(r, "", &lv_font_montserrat_16);
-    lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_16);
-    lv_obj_t* es = ui_btn(r, "E-STOP", 92, 44, estop_cb, nullptr, COL_RED);
-    lv_obj_set_style_text_font(es, &lv_font_montserrat_16, 0);
+    lblExt = ui_label(r, "", &icons_20);
+    lv_obj_set_style_text_font(lblExt, &lv_font_montserrat_14, 0);
+    lblBed = ui_label(r, "", &lv_font_montserrat_14);
+    lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_14);
+    lv_obj_t* es = ui_btn(r, "STOP", 52, 32, estop_cb, nullptr, COL_RED);
+    lv_obj_set_style_text_font(es, &lv_font_montserrat_14, 0);
 }
 
 static void update_topbar() {
     char buf[48];
-    snprintf(buf, sizeof(buf), LV_SYMBOL_TINT " %.0f/%.0f" DEG, g.ext.temp, g.ext.target);
+    snprintf(buf, sizeof(buf), "E %.0f/%.0f" DEG, g.ext.temp, g.ext.target);
     set_text(lblExt, g.ready ? buf : "");
     if (g.hasBed && g.ready) {
-        snprintf(buf, sizeof(buf), "Bed %.0f/%.0f" DEG, g.bed.temp, g.bed.target);
+        snprintf(buf, sizeof(buf), "B %.0f/%.0f" DEG, g.bed.temp, g.bed.target);
         set_text(lblBed, buf);
     } else {
         set_text(lblBed, "");
     }
-    const char* st = !g.online ? "offline" : !g.ready ? g.klippy : g.pstate;
-    set_text(lblState, st);
-    set_text_color(lblState, state_color(st));
     set_text_color(lblWifi, g.wifi ? COL_GREEN : COL_RED);
 }
 
@@ -443,18 +449,12 @@ static void update_sleep() {
 
 // ---------------------------------------------------------------- main timer
 
-static bool dashMode = false;  // no touch panel: read-only status dashboard
-
 static void tick_cb(lv_timer_t*) {
     static uint32_t lastErr = 0;
     static char lastPstate[16] = "";
     static bool first = true;
 
     mr_get(&g);
-    if (dashMode) {
-        if (upd) upd();
-        return;
-    }
     update_topbar();
 
     if (first) {
@@ -493,25 +493,17 @@ void ui_init() {
     lv_obj_clean(lv_scr_act());  // remove the boot logo
     ui_icons_init();
     lv_disp_t* disp = lv_disp_get_default();
-    lv_theme_t* th = lv_theme_default_init(disp, COL_ACCENT, COL_RED, true, &lv_font_montserrat_20);
+    lv_theme_t* th = lv_theme_default_init(disp, COL_ACCENT, COL_RED, true, &lv_font_montserrat_16);
     lv_disp_set_theme(disp, th);
 
     lv_obj_t* scr = lv_scr_act();
     lv_obj_set_style_bg_color(scr, COL_BG, 0);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-    if (!board_has_touch()) {
-        dashMode = true;
-        mr_get(&g);
-        scr_dashboard(scr);
-        lv_timer_create(tick_cb, 500, nullptr);
-        return;
-    }
-
     build_topbar(scr);
 
     content = lv_obj_create(scr);
-    lv_obj_set_pos(content, 0, 56);
+    lv_obj_set_pos(content, 0, TOPBAR_H);
     lv_obj_set_size(content, CONTENT_W, CONTENT_H);
     lv_obj_set_style_bg_opa(content, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(content, 0, 0);
@@ -542,15 +534,15 @@ static void home_update() {
     char buf[256];
     snprintf(buf, sizeof(buf), "%.1f" DEG, g.ext.temp);
     set_text(hExtT, buf);
-    snprintf(buf, sizeof(buf), "/ %.0f" DEG, g.ext.target);
+    snprintf(buf, sizeof(buf), "target %.0f" DEG, g.ext.target);
     set_text(hExtTg, buf);
     snprintf(buf, sizeof(buf), "%.1f" DEG, g.bed.temp);
     set_text(hBedT, g.hasBed ? buf : "--");
-    snprintf(buf, sizeof(buf), "/ %.0f" DEG, g.bed.target);
+    snprintf(buf, sizeof(buf), "target %.0f" DEG, g.bed.target);
     set_text(hBedTg, g.hasBed ? buf : "");
 
     String ex;
-    for (int i = 0; i < g.nExtra && i < 4; i++) {
+    for (int i = 0; i < g.nExtra && i < 2; i++) {
         snprintf(buf, sizeof(buf), "%s: %.1f" DEG "\n", g.extra[i].label, g.extra[i].temp);
         ex += buf;
     }
@@ -558,17 +550,12 @@ static void home_update() {
 
     bool showConn = !g.online;
     bool showRestart = g.online && !g.ready;
-    if (net_ap_active())
-        snprintf(buf, sizeof(buf), "Setup: join Wi-Fi \"%s\" and open http://192.168.4.1", SETUP_AP_SSID);
-    else if (!g.wifi) snprintf(buf, sizeof(buf), "Connecting to Wi-Fi %s...", cfg.ssid);
-    else if (!g.online) snprintf(buf, sizeof(buf), "Moonraker unreachable at %s:%u", cfg.host, cfg.port);
-    else if (!g.ready) snprintf(buf, sizeof(buf), "Klipper %s\n%s", g.klippy, g.klippyMsg);
+    if (net_ap_active()) snprintf(buf, sizeof(buf), "Setup: join Wi-Fi\n\"%s\"", SETUP_AP_SSID);
+    else if (!g.wifi) snprintf(buf, sizeof(buf), "Connecting to\n%s...", cfg.ssid);
+    else if (!g.online) snprintf(buf, sizeof(buf), "Printer offline\n%s:%u", cfg.host, cfg.port);
+    else if (!g.ready) snprintf(buf, sizeof(buf), "Klipper %s", g.klippy);
     else if (is_printing()) snprintf(buf, sizeof(buf), "%s %.0f%%", g.pstate, g.progress * 100);
     else snprintf(buf, sizeof(buf), "%s", g.message[0] ? g.message : "Ready");
-    if (g.wifi) {
-        size_t n = strlen(buf);
-        snprintf(buf + n, sizeof(buf) - n, "\nDisplay: http://%s", WiFi.localIP().toString().c_str());
-    }
     set_text(hStatus, buf);
     set_text_color(hStatus, !g.ready ? COL_ORANGE : COL_DIM);
 
@@ -587,58 +574,60 @@ static void home_update() {
 }
 
 void scr_home(lv_obj_t* p) {
-    lv_obj_t* c = ui_card(p, 8, 8, 262, 408);
+    lv_obj_t* c = ui_card(p, 6, 6, 160, 268);
 
-    ui_label(c, LV_SYMBOL_TINT " Extruder", &lv_font_montserrat_16, COL_DIM);
-    hExtT = ui_label(c, "", &lv_font_montserrat_32);
+    ui_label(c, ICON_NOZZLE " Hotend", &icons_20, COL_DIM);
+    hExtT = ui_label(c, "", &lv_font_montserrat_28);
     lv_obj_set_pos(hExtT, 0, 22);
-    hExtTg = ui_label(c, "", &lv_font_montserrat_20, COL_DIM);
-    lv_obj_set_pos(hExtTg, 140, 32);
+    hExtTg = ui_label(c, "", &lv_font_montserrat_14, COL_DIM);
+    lv_obj_set_pos(hExtTg, 0, 54);
 
-    lv_obj_t* l = ui_label(c, "Bed", &lv_font_montserrat_16, COL_DIM);
-    lv_obj_set_pos(l, 0, 72);
-    hBedT = ui_label(c, "", &lv_font_montserrat_32);
-    lv_obj_set_pos(hBedT, 0, 94);
-    hBedTg = ui_label(c, "", &lv_font_montserrat_20, COL_DIM);
-    lv_obj_set_pos(hBedTg, 140, 104);
+    lv_obj_t* l = ui_label(c, ICON_BED " Bed", &icons_20, COL_DIM);
+    lv_obj_set_pos(l, 0, 76);
+    hBedT = ui_label(c, "", &lv_font_montserrat_28);
+    lv_obj_set_pos(hBedT, 0, 98);
+    hBedTg = ui_label(c, "", &lv_font_montserrat_14, COL_DIM);
+    lv_obj_set_pos(hBedTg, 0, 130);
 
-    hExtra = ui_label(c, "", &lv_font_montserrat_16, COL_TEXT);
-    lv_obj_set_pos(hExtra, 0, 146);
+    hExtra = ui_label(c, "", &lv_font_montserrat_12, COL_TEXT);
+    lv_obj_set_pos(hExtra, 0, 152);
 
-    hStatus = ui_label(c, "", &lv_font_montserrat_16, COL_DIM);
+    hStatus = ui_label(c, "", &lv_font_montserrat_12, COL_DIM);
     lv_label_set_long_mode(hStatus, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(hStatus, 240);
-    lv_obj_set_pos(hStatus, 0, 236);
+    lv_obj_set_width(hStatus, 144);
+    lv_obj_set_pos(hStatus, 0, 186);
 
-    hBtnRow = ui_row(c, 242, 52);
+    hBtnRow = ui_row(c, 144, 30);
     lv_obj_align(hBtnRow, LV_ALIGN_BOTTOM_MID, 0, 0);
-    hBtnRestart = ui_btn(hBtnRow, "Restart", 116, 48, restart_cb);
-    hBtnFw = ui_btn(hBtnRow, "FW Restart", 116, 48, fwrestart_cb, nullptr, COL_ORANGE);
-    hBtnConn = ui_btn(hBtnRow, LV_SYMBOL_WIFI " Connection", 240, 48, conn_cb, nullptr, COL_ACCENT);
-    lv_obj_set_style_text_font(hBtnRestart, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_font(hBtnFw, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_pad_column(hBtnRow, 4, 0);
+    hBtnRestart = ui_btn(hBtnRow, "Restart", 70, 30, restart_cb);
+    hBtnFw = ui_btn(hBtnRow, "FW", 70, 30, fwrestart_cb, nullptr, COL_ORANGE);
+    hBtnConn = ui_btn(hBtnRow, LV_SYMBOL_WIFI " Connect", 144, 30, conn_cb, nullptr, COL_ACCENT);
+    lv_obj_set_style_text_font(hBtnRestart, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(hBtnFw, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(hBtnConn, &lv_font_montserrat_14, 0);
 
     lv_obj_t* grid = lv_obj_create(p);
-    lv_obj_set_pos(grid, 278, 8);
-    lv_obj_set_size(grid, 514, 408);
+    lv_obj_set_pos(grid, 172, 6);
+    lv_obj_set_size(grid, 302, 268);
     lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(grid, 0, 0);
     lv_obj_set_style_pad_all(grid, 0, 0);
-    lv_obj_set_style_pad_row(grid, 12, 0);
-    lv_obj_set_style_pad_column(grid, 12, 0);
+    lv_obj_set_style_pad_row(grid, 5, 0);
+    lv_obj_set_style_pad_column(grid, 5, 0);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
 
     struct T { const char* icon; const char* txt; Scr s; };
     static const T tiles[] = {
-        {LV_SYMBOL_PLAY, "Print", S_FILES},       {LV_SYMBOL_CHARGE, "Temperature", S_TEMP},
-        {LV_SYMBOL_SHUFFLE, "Move", S_MOVE},      {LV_SYMBOL_TINT, "Extrude", S_EXTRUDE},
-        {LV_SYMBOL_LOOP, "Fans & Speed", S_FANS}, {LV_SYMBOL_LIST, "Macros", S_MACROS},
+        {ICON_PRINTER, "Print", S_FILES},          {ICON_THERMO, "Temperature", S_TEMP},
+        {ICON_POS, "Move", S_MOVE},                {ICON_NOZZLE, "Extrude", S_EXTRUDE},
+        {ICON_FAN, "Fans & Speed", S_FANS},        {LV_SYMBOL_LIST, "Macros", S_MACROS},
         {LV_SYMBOL_KEYBOARD, "Console", S_CONSOLE}, {LV_SYMBOL_POWER, "Power", S_POWER},
         {LV_SYMBOL_SETTINGS, "Settings", S_SETTINGS},
     };
     for (auto& t : tiles) {
-        lv_obj_t* b = ui_tile(grid, t.icon, t.txt, 163, 128, home_tile_cb, (void*)(intptr_t)t.s,
+        lv_obj_t* b = ui_tile(grid, t.icon, t.txt, 97, 86, home_tile_cb, (void*)(intptr_t)t.s,
                               t.s == S_FILES ? COL_ACCENT : COL_BTN);
         if (t.s == S_FILES) hPrintTile = b;
     }

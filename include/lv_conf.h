@@ -8,12 +8,12 @@
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 0
 
-/* LVGL heap in PSRAM; internal RAM is reserved for Wi-Fi/lwIP (see lv_psram.h) */
+/* libc heap (no PSRAM on the WT32-SC01) */
 #define LV_MEM_CUSTOM 1
-#define LV_MEM_CUSTOM_INCLUDE "lv_psram.h"
-#define LV_MEM_CUSTOM_ALLOC lv_psram_malloc
+#define LV_MEM_CUSTOM_INCLUDE <stdlib.h>
+#define LV_MEM_CUSTOM_ALLOC malloc
 #define LV_MEM_CUSTOM_FREE free
-#define LV_MEM_CUSTOM_REALLOC lv_psram_realloc
+#define LV_MEM_CUSTOM_REALLOC realloc
 
 #define LV_TICK_CUSTOM 1
 #define LV_TICK_CUSTOM_INCLUDE "Arduino.h"
@@ -29,18 +29,17 @@
 #define LV_USE_PERF_MONITOR 0
 #define LV_USE_MEM_MONITOR 0
 
-#define LV_IMG_CACHE_DEF_SIZE 2
+#define LV_IMG_CACHE_DEF_SIZE 1
 
+/* sized for the 480x320 screen */
+#define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_20 1
-#define LV_FONT_MONTSERRAT_24 1
 #define LV_FONT_MONTSERRAT_28 1
-#define LV_FONT_MONTSERRAT_32 1
-#define LV_FONT_MONTSERRAT_48 1
-#define LV_FONT_DEFAULT &lv_font_montserrat_20
+#define LV_FONT_DEFAULT &lv_font_montserrat_16
 
-#define LV_USE_PNG 1          /* print thumbnails from Moonraker */
+#define LV_USE_PNG 1          /* print thumbnails from Moonraker (small ones: no PSRAM) */
 
 #define LV_BUILD_EXAMPLES 0
 

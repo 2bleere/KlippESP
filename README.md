@@ -1,6 +1,23 @@
 <p align="center"><img src="assets/boot_logo_preview.png" width="160" alt="2bleere"></p>
 
-# KlippESP
+# KlippESP – WT32-SC01 edition
+
+> **Branch `wt32-sc01`:** the KlipperScreen-style **touch interface** ported to the Wireless-Tag **WT32-SC01 (V3.3)**:
+> ESP32-D0WD, 4 MB flash, no PSRAM, 3.5" ST7796 **480×320** SPI display, FT6336U capacitive touch, dimmable backlight.
+> The Waveshare ESP32-S3-Touch-LCD-7 version (touch UI + no-touch status dashboard) lives on `main`.
+
+## WT32-SC01 specifics
+
+- Build / flash over USB: `pio run -e wt32_sc01 -t upload`
+- Over the air: set `upload_port` in `[env:wt32_sc01_ota]`, then `pio run -e wt32_sc01_ota -t upload`
+- Display + touch driver: LovyanGFX (SPI sclk 14, mosi 13, dc 21, cs 15, rst 22; backlight PWM 23; touch I2C sda 18, scl 19, int 39, addr 0x38)
+- Screens are laid out for 480×320; orientation can be flipped 180° (settings page)
+- Brightness: Settings → System slider, or the settings web page
+- No PSRAM: print thumbnails use the slicer's small thumbnail (≤ 120 px); about 140 KB RAM stays free
+- During firmware updates the screen shows a real progress bar (the ST7796 keeps its own frame memory)
+
+---
+
 
 A Klipper printer display for the **Waveshare ESP32-S3-Touch-LCD-7** (800×480). It talks to **Moonraker**, the same API Mainsail uses, over Wi-Fi, so nothing needs to be installed on the printer.
 

@@ -15,7 +15,7 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "assets", "logo_source.png")
-BOOT_SIZE = 340   # px on the 800x480 panel
+BOOT_SIZE = 220   # px on the 480x320 panel
 WEB_SIZE = 160    # px PNG for the settings page
 
 

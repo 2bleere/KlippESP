@@ -1,5 +1,11 @@
 # KlippESP – notes for working on this repo
 
+> **This is the `wt32-sc01` branch:** touch UI only, for the WT32-SC01 (classic ESP32, 4 MB flash, NO PSRAM,
+> ST7796 480×320 SPI + FT6336U, LovyanGFX). Envs: `wt32_sc01`, `wt32_sc01_ota`. Layout constants: `TOPBAR_H 40`,
+> `CONTENT_W 480`, `CONTENT_H 280`; fonts Montserrat 12/14/16/20/28 + icons_20/28. Keep RAM in mind (~140 KB free at
+> runtime): thumbnails ≤ 120 px (`THUMB_MAX_W`), one 480×40 DMA draw buffer. The Waveshare-specific notes below
+> (PSRAM, CH422G, RGB panel, dashboard) apply to `main`. Port Moonraker/net fixes between branches with cherry-pick.
+
 ESP32-S3 firmware (Arduino core 2.0.14 / ESP-IDF 4.4, PlatformIO, LVGL 8.3, Arduino_GFX 1.4.7, ArduinoJson 7) that shows
 Klipper status from Moonraker over Wi-Fi on a Waveshare ESP32-S3-Touch-LCD-7 (800×480 RGB565, N16R8).
 

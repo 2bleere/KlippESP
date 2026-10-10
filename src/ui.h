@@ -16,8 +16,9 @@
 #define COL_TEXT    lv_color_hex(0xe6edf3)
 #define COL_DIM     lv_color_hex(0x8b949e)
 
-#define CONTENT_W 800
-#define CONTENT_H 424
+#define TOPBAR_H 40
+#define CONTENT_W 480
+#define CONTENT_H 280
 
 enum Scr {
     S_HOME, S_FILES, S_PRINTING, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,
@@ -82,7 +83,5 @@ void scr_system(lv_obj_t* p);
 
 bool is_printing();  // printing or paused
 
-// status-only dashboard used when no touch panel is present
-void scr_dashboard(lv_obj_t* scr);
 // show the current print's thumbnail in img (scaled to fit box px); call periodically
 void ui_print_thumb(lv_obj_t* img, lv_coord_t box);

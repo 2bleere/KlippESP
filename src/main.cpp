@@ -1,4 +1,4 @@
-// KlipperScreen-style touch interface for the Waveshare ESP32-S3-Touch-LCD-7.
+// KlippESP - KlipperScreen-style touch interface for the WT32-SC01 (ESP32, 480x320).
 #include <Arduino.h>
 #include <WiFi.h>
 #include <lvgl.h>
@@ -11,12 +11,12 @@
 
 void setup() {
     Serial.begin(115200);
-    Serial0.begin(115200);
     settings_load();
 
     net_begin();
 
     board_init(cfg.rotation);
+    board_set_brightness(cfg.brightness);
     ui_icons_init();
     ui_boot_logo();
     mr_begin();
