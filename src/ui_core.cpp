@@ -341,18 +341,17 @@ static void build(Scr s) {
     lv_obj_clean(content);
     cur = s;
     lv_label_set_text(lblTitle, titles[s]);
+    bool badge = s == S_HOME || s == S_PRINTING;  // these show a live state badge instead of a fixed title
     if (s == S_HOME) {
         lv_obj_add_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_pos(lblTitle, 8, 7);
-        lv_obj_set_style_bg_opa(lblTitle, LV_OPA_COVER, 0);  // state badge (update_badge)
-        update_badge();
     } else {
         lv_obj_clear_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_set_pos(lblTitle, 98, 11);
-        lv_obj_set_style_bg_opa(lblTitle, LV_OPA_TRANSP, 0);
     }
+    lv_obj_set_pos(lblTitle, s == S_HOME ? 8 : 98, badge ? 7 : 11);
+    lv_obj_set_style_bg_opa(lblTitle, badge ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
+    if (badge) update_badge();
     builders[s](content);
     if (upd) upd();
 }
@@ -433,16 +432,20 @@ static void update_badge() {
         col = starting ? COL_ORANGE : COL_RED;
     } else if (!strcmp(g.pstate, "printing")) { icon = LV_SYMBOL_PLAY; text = "Printing"; col = COL_ACCENT; }
     else if (!strcmp(g.pstate, "paused")) { icon = LV_SYMBOL_PAUSE; text = "Paused"; col = COL_ORANGE; }
+    else if (!strcmp(g.pstate, "complete")) { icon = LV_SYMBOL_OK; text = "Complete"; col = COL_GREEN; }
+    else if (!strcmp(g.pstate, "cancelled")) { icon = LV_SYMBOL_CLOSE; text = "Cancelled"; col = COL_ORANGE; }
+    else if (!strcmp(g.pstate, "error")) { icon = LV_SYMBOL_WARNING; text = "Print error"; col = COL_RED; }
     else if (heating) { icon = LV_SYMBOL_UP; text = "Heating"; col = COL_ORANGE; }
     else { icon = LV_SYMBOL_OK; text = "Ready"; col = COL_GREEN; }
-    char buf[32];
-    snprintf(buf, sizeof(buf), "%s %s", icon, text);
+    char buf[40];
+    if (is_printing()) snprintf(buf, sizeof(buf), "%s %s %.0f%%", icon, text, g.progress * 100);
+    else snprintf(buf, sizeof(buf), "%s %s", icon, text);
     set_text(lblTitle, buf);
     set_bg_color(lblTitle, col, 0);
 }
 
 static void update_topbar() {
-    if (cur == S_HOME) update_badge();
+    if (cur == S_HOME || cur == S_PRINTING) update_badge();
     char buf[48];
     snprintf(buf, sizeof(buf), "E %.0f/%.0f" DEG, g.ext.temp, g.ext.target);
     set_text(lblExt, g.ready ? buf : "");
@@ -507,6 +510,7 @@ static void tick_cb(lv_timer_t*) {
         bool job = g.ready && (is_printing() || !strcmp(g.pstate, "complete") || !strcmp(g.pstate, "cancelled") ||
                                (!strcmp(g.pstate, "error") && g.file[0]));
         if (job && cur != S_PRINTING) ui_goto(S_PRINTING);
+        else if (!job && !g.ready && cur == S_PRINTING) ui_goto(S_HOME);  // offline or Klipper down
         else if (!job && g.online && !g.ready && cur != S_HOME) ui_goto(S_HOME);
         else if (!job && g.ready && cur == S_PRINTING) ui_goto(S_HOME);
     }
