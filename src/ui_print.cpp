@@ -43,21 +43,22 @@ static void open_detail(const char* file) {
     mr_request_meta(file);
 
     dOverlay = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(dOverlay, LCD_W, LCD_H);
+    lv_obj_set_size(dOverlay, SW, SH);
     set_bg_color(dOverlay, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(dOverlay, LV_OPA_60, 0);
     lv_obj_set_style_border_width(dOverlay, 0, 0);
     lv_obj_set_style_radius(dOverlay, 0, 0);
 
-    lv_obj_t* c = ui_card(dOverlay, 0, 0, 464, 300);
+    const lv_coord_t cw = PORTRAIT ? 308 : 464, ch = PORTRAIT ? 380 : 300;
+    lv_obj_t* c = ui_card(dOverlay, 0, 0, cw, ch);
     lv_obj_center(c);
     lv_obj_t* name = ui_label(c, basename_of(file), &lv_font_montserrat_16);
     lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(name, 446);
+    lv_obj_set_width(name, cw - 18);
 
     lv_obj_t* box = lv_obj_create(c);
     lv_obj_set_pos(box, 0, 26);
-    lv_obj_set_size(box, 140, 140);
+    lv_obj_set_size(box, PORTRAIT ? 90 : 140, PORTRAIT ? 90 : 140);
     set_bg_color(box, COL_BG, 0);
     lv_obj_set_style_border_width(box, 0, 0);
     lv_obj_set_style_pad_all(box, 0, 0);
@@ -66,14 +67,14 @@ static void open_detail(const char* file) {
     lv_obj_center(ph);
 
     dInfo = ui_label(c, "Loading...", &lv_font_montserrat_14, COL_TEXT);
-    lv_obj_set_pos(dInfo, 152, 30);
-    lv_obj_set_width(dInfo, 294);
+    lv_obj_set_pos(dInfo, PORTRAIT ? 100 : 152, 30);
+    lv_obj_set_width(dInfo, cw - 18 - (PORTRAIT ? 100 : 152));
     lv_obj_set_style_text_line_space(dInfo, 4, 0);
 
-    lv_obj_t* r = ui_row(c, 446, 50);
+    lv_obj_t* r = ui_row(c, cw - 18, 50);
     lv_obj_align(r, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    ui_btn(r, "Cancel", 130, 46, detail_close);
+    ui_btn(r, "Cancel", PORTRAIT ? 120 : 130, 46, detail_close);
     lv_obj_t* pb = ui_btn(r, LV_SYMBOL_PLAY " Print", 150, 46, detail_print, nullptr, COL_GREEN);
     if (is_printing() || !g.ready) lv_obj_add_state(pb, LV_STATE_DISABLED);
 }
@@ -118,7 +119,7 @@ static void files_rebuild() {
     for (size_t i = 0; i < fFiles.size(); i++) {
         const MrFile& f = fFiles[i];
         lv_obj_t* b = lv_btn_create(fList);
-        lv_obj_set_size(b, 456, 46);
+        lv_obj_set_size(b, CONTENT_W - 24, 46);
         set_bg_color(b, COL_CARD, 0);
         lv_obj_set_style_shadow_width(b, 0, 0);
         lv_obj_set_style_radius(b, 8, 0);
@@ -127,7 +128,7 @@ static void files_rebuild() {
 
         lv_obj_t* n = ui_label(b, f.path.c_str(), &lv_font_montserrat_14);
         lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
-        lv_obj_set_width(n, 440);
+        lv_obj_set_width(n, CONTENT_W - 40);
         lv_obj_align(n, LV_ALIGN_TOP_LEFT, 4, 2);
 
         time_t t = f.modified;
@@ -153,7 +154,7 @@ static void files_update() {
 }
 
 void scr_files(lv_obj_t* p) {
-    lv_obj_t* hdr = ui_row(p, 468, 38);
+    lv_obj_t* hdr = ui_row(p, CONTENT_W - 12, 38);
     lv_obj_set_pos(hdr, 6, 2);
     fCount = ui_label(hdr, "Loading...", &lv_font_montserrat_14, COL_DIM);
     lv_obj_set_flex_grow(fCount, 1);
@@ -224,30 +225,35 @@ static void zoffset_update() {
 }
 
 void scr_zoffset(lv_obj_t* p) {
-    lv_obj_t* c = ui_card(p, 6, 6, 226, 268);
+    const bool P = PORTRAIT;
+    const lv_coord_t w1 = P ? CONTENT_W - 12 : 226, h1 = P ? 150 : 268;
+    lv_obj_t* c = ui_card(p, 6, 6, w1, h1);
     ui_label(c, "Current Z offset", &lv_font_montserrat_14, COL_DIM);
     zVal = ui_label(c, "", &lv_font_montserrat_28);
     lv_obj_set_pos(zVal, 0, 24);
-    lv_obj_t* hint = ui_label(c, "Positive values raise the\nnozzle. Applied immediately,\nalso during a print.",
+    lv_obj_t* hint = ui_label(c, P ? "Positive raises the nozzle; applied immediately."
+                                   : "Positive values raise the\nnozzle. Applied immediately,\nalso during a print.",
                               &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(hint, 0, 70);
-    lv_obj_t* r = ui_row(c, 210, 46);
+    lv_obj_set_pos(hint, 0, P ? 62 : 70);
+    lv_obj_t* r = ui_row(c, w1 - 16, 46);
     lv_obj_align(r, LV_ALIGN_BOTTOM_MID, 0, 0);
-    ui_btn(r, "Reset", 102, 44, zreset_cb);
-    zSave = ui_btn(r, LV_SYMBOL_SAVE " Save", 102, 44, zsave_cb, nullptr, COL_GREEN);
+    ui_btn(r, "Reset", (w1 - 22) / 2, 44, zreset_cb);
+    zSave = ui_btn(r, LV_SYMBOL_SAVE " Save", (w1 - 22) / 2, 44, zsave_cb, nullptr, COL_GREEN);
 
-    lv_obj_t* s = ui_card(p, 238, 6, 236, 268);
-    ui_btn(s, LV_SYMBOL_UP "  Raise nozzle", 220, 74, zadj_cb, (void*)(intptr_t)1);
-    lv_obj_t* lower = ui_btn(s, LV_SYMBOL_DOWN "  Lower nozzle", 220, 74, zadj_cb, (void*)(intptr_t)-1);
+    const lv_coord_t x2 = P ? 6 : 238, y2 = P ? 162 : 6, w2 = P ? CONTENT_W - 12 : 236, h2 = CONTENT_H - 6 - y2;
+    const lv_coord_t iw = w2 - 16;
+    lv_obj_t* s = ui_card(p, x2, y2, w2, h2);
+    ui_btn(s, LV_SYMBOL_UP "  Raise nozzle", iw, 74, zadj_cb, (void*)(intptr_t)1);
+    lv_obj_t* lower = ui_btn(s, LV_SYMBOL_DOWN "  Lower nozzle", iw, 74, zadj_cb, (void*)(intptr_t)-1);
     lv_obj_set_pos(lower, 0, 80);
     lv_obj_t* l = ui_label(s, "Step (mm)", &lv_font_montserrat_12, COL_DIM);
     lv_obj_set_pos(l, 0, 162);
-    lv_obj_t* sr = ui_row(s, 220, 70);
+    lv_obj_t* sr = ui_row(s, iw, h2 - 16 - 180);
     lv_obj_align(sr, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_style_pad_column(sr, 3, 0);
     static const char* names[] = {"0.005", "0.01", "0.025", "0.05", "0.1"};
     for (int i = 0; i < 5; i++) {
-        zStepBtns[i] = ui_btn(sr, names[i], 41, 64, zstep_cb, (void*)(intptr_t)i);
+        zStepBtns[i] = ui_btn(sr, names[i], (iw - 12) / 5, h2 - 16 - 184, zstep_cb, (void*)(intptr_t)i);
         lv_obj_set_style_text_font(zStepBtns[i], &lv_font_montserrat_12, 0);
         ui_select(zStepBtns[i], i == zStep);
     }

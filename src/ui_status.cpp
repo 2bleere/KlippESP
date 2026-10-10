@@ -3,6 +3,7 @@
 // main branch's dashboard.
 #include "ui.h"
 #include "ui_icons.h"
+#include "net.h"
 #include <vector>
 
 #define COL_COLD lv_color_hex(0x58a6ff)
@@ -138,16 +139,19 @@ static Gauge hExt, hBed;
 static lv_obj_t* hPrintTile;
 #define HOME_SLOTS 6
 static lv_obj_t *hSlotName[HOME_SLOTS], *hSlotVal[HOME_SLOTS];
-static lv_obj_t* hBtnRow;
-static lv_obj_t *hBtnRestart, *hBtnFw;
+static lv_coord_t hSlotNameW;
+static lv_obj_t *hOnline[3];                        // gauges + list, hidden while the printer is unavailable
+static lv_obj_t *hOff, *hOffIcon, *hOffTitle, *hOffText, *hOffBtns;
+static lv_obj_t* hTiles[9];
+static const Scr HOME_TILE_SCR[9] = {S_FILES, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS, S_CONSOLE, S_POWER, S_SETTINGS};
 
 static void restart_cb(lv_event_t*) { mr_post("/printer/restart"); }
 static void fwrestart_cb(lv_event_t*) { mr_post("/printer/firmware_restart"); }
 
-static void home_gauge(Gauge& gg, lv_obj_t* p, lv_coord_t y, const char* icon, const char* name, int max) {
-    lv_obj_t* c = ui_card(p, 6, y, 236, 86);
+static lv_obj_t* home_gauge(Gauge& gg, lv_obj_t* p, lv_coord_t y, lv_coord_t w, const char* icon, const char* name, int max) {
+    lv_obj_t* c = ui_card(p, 6, y, w, 84);
     gg.max = max;
-    gg.arc = make_arc(c, 68, 8, 135, 270);
+    gg.arc = make_arc(c, 66, 8, 135, 270);
     lv_obj_align(gg.arc, LV_ALIGN_LEFT_MID, 0, 0);
     gg.icon = ui_label(gg.arc, icon, &icons_20, COL_DIM);
     lv_obj_center(gg.icon);
@@ -158,12 +162,55 @@ static void home_gauge(Gauge& gg, lv_obj_t* p, lv_coord_t y, const char* icon, c
     gg.target = ui_label(c, "", &icons_20, COL_DIM);
     lv_obj_align(gg.target, LV_ALIGN_TOP_RIGHT, 0, -2);
     gg.bar = lv_bar_create(c);
-    lv_obj_set_size(gg.bar, 142, 6);
-    lv_obj_set_pos(gg.bar, 78, 58);
+    lv_obj_set_size(gg.bar, w - 16 - 78, 6);
+    lv_obj_set_pos(gg.bar, 78, 56);
     lv_bar_set_range(gg.bar, 0, 1000);
+    return c;
+}
+
+// Printer unavailable: big status card instead of gauges, and only Settings + Power in the menu.
+static void home_offline() {
+    const char *icon, *title;
+    char text[220];
+    lv_color_t col = COL_RED;
+    if (net_ap_active()) {
+        icon = LV_SYMBOL_WIFI; title = "Wi-Fi setup"; col = COL_ACCENT;
+        snprintf(text, sizeof(text), "Join Wi-Fi \"%s\" and open http://192.168.4.1, or use Settings > Connection.", SETUP_AP_SSID);
+    } else if (!g.wifi) {
+        icon = LV_SYMBOL_WIFI; title = "No Wi-Fi"; col = COL_ORANGE;
+        snprintf(text, sizeof(text), "Connecting to %s...", cfg.ssid[0] ? cfg.ssid : "(not configured)");
+    } else if (!cfg.host[0]) {
+        icon = LV_SYMBOL_SETTINGS; title = "Printer not set"; col = COL_ORANGE;
+        snprintf(text, sizeof(text), "Enter the printer's IP in Settings > Connection.");
+    } else if (!g.online) {
+        icon = LV_SYMBOL_CLOSE; title = "Printer offline";
+        snprintf(text, sizeof(text), "Moonraker not reachable at %s:%u", cfg.host, cfg.port);
+    } else {
+        bool starting = !strcmp(g.klippy, "startup");
+        icon = starting ? LV_SYMBOL_REFRESH : LV_SYMBOL_WARNING;
+        title = starting ? "Klipper starting" : !strcmp(g.klippy, "shutdown") ? "Klipper shutdown" : "Klipper error";
+        col = starting ? COL_ORANGE : COL_RED;
+        snprintf(text, sizeof(text), "%s", g.klippyMsg[0] ? g.klippyMsg : g.klippy);
+    }
+    set_text(hOffIcon, icon);
+    set_text_color(hOffIcon, col);
+    set_text(hOffTitle, title);
+    set_text_color(hOffTitle, col);
+    set_text(hOffText, text);
+    set_visible(hOffBtns, g.online && !g.ready);
 }
 
 static void home_update() {
+    bool up = g.ready;
+    for (lv_obj_t* o : hOnline) set_visible(o, up);
+    set_visible(hOff, !up);
+    for (int k = 0; k < 9; k++)
+        set_visible(hTiles[k], up || HOME_TILE_SCR[k] == S_SETTINGS || HOME_TILE_SCR[k] == S_POWER);
+    if (!up) {
+        home_offline();
+        return;
+    }
+
     update_gauge(hExt, g.ext, true);
     update_gauge(hBed, g.bed, g.hasBed);
 
@@ -172,70 +219,82 @@ static void home_update() {
     char name[32], val[16];
     auto put = [&](const char* label, const char* v, lv_color_t col, bool fan) {
         if (i >= HOME_SLOTS) return;
-        fit_name(name, sizeof(name), &lv_font_montserrat_12, 66, label, fan);
+        fit_name(name, sizeof(name), &lv_font_montserrat_12, hSlotNameW, label, fan);
         set_text(hSlotName[i], name);
         set_text(hSlotVal[i], v);
         set_text_color(hSlotVal[i], col);
         i++;
     };
-    bool klipperDown = g.online && !g.ready;
-    if (!klipperDown) {
-        for (int k = 0; g.ready && k < g.nExtra; k++) {
-            snprintf(val, sizeof(val), "%.0f" DEG, g.extra[k].temp);
-            put(g.extra[k].label, val, g.extra[k].settable && g.extra[k].target > 0 ? COL_ORANGE : COL_TEXT, false);
-        }
-        for (int k = 0; g.ready && k < g.nFans; k++) {
-            char lbl[40];
-            snprintf(lbl, sizeof(lbl), "%s%s", g.fans[k].label, strcasestr(g.fans[k].label, "fan") ? "" : " fan");
-            if (g.fans[k].speed > 0) snprintf(val, sizeof(val), "%.0f%%", g.fans[k].speed * 100);
-            else snprintf(val, sizeof(val), "off");
-            put(lbl, val, g.fans[k].speed > 0 ? COL_ACCENT : COL_DIM, true);
-        }
-        if (g.online && g.host.valid) {
-            snprintf(val, sizeof(val), "%.0f%%", g.host.cpu);
-            put("CPU", val, load_color(g.host.cpu), false);
-            float mp = pct(g.host.memUsed, g.host.memTotal);
-            snprintf(val, sizeof(val), "%.0f%%", mp);
-            put("Memory", val, load_color(mp), false);
-        }
+    for (int k = 0; k < g.nExtra; k++) {
+        snprintf(val, sizeof(val), "%.0f" DEG, g.extra[k].temp);
+        put(g.extra[k].label, val, g.extra[k].settable && g.extra[k].target > 0 ? COL_ORANGE : COL_TEXT, false);
+    }
+    for (int k = 0; k < g.nFans; k++) {
+        char lbl[40];
+        snprintf(lbl, sizeof(lbl), "%s%s", g.fans[k].label, strcasestr(g.fans[k].label, "fan") ? "" : " fan");
+        if (g.fans[k].speed > 0) snprintf(val, sizeof(val), "%.0f%%", g.fans[k].speed * 100);
+        else snprintf(val, sizeof(val), "off");
+        put(lbl, val, g.fans[k].speed > 0 ? COL_ACCENT : COL_DIM, true);
+    }
+    if (g.host.valid) {
+        snprintf(val, sizeof(val), "%.0f%%", g.host.cpu);
+        put("CPU", val, load_color(g.host.cpu), false);
+        float mp = pct(g.host.memUsed, g.host.memTotal);
+        snprintf(val, sizeof(val), "%.0f%%", mp);
+        put("Memory", val, load_color(mp), false);
     }
     for (; i < HOME_SLOTS; i++) {
         set_text(hSlotName[i], "");
         set_text(hSlotVal[i], "");
     }
-    set_visible(hBtnRow, klipperDown);
     set_text(lv_obj_get_child(hPrintTile, 1), is_printing() ? "Status" : "Print");
 }
 
 void scr_home(lv_obj_t* p) {
-    home_gauge(hExt, p, 6, ICON_NOZZLE, "Hotend", 300);
-    home_gauge(hBed, p, 98, ICON_BED, "Bed", 120);
+    // landscape: status column left, 3x3 menu right; portrait: status on top, 3x3 menu below
+    const lv_coord_t pw = PORTRAIT ? CONTENT_W - 12 : 236;           // status panel width
+    const lv_coord_t ph = PORTRAIT ? 264 : CONTENT_H - 12;           // status panel height
+    hOnline[0] = home_gauge(hExt, p, 6, pw, ICON_NOZZLE, "Hotend", 300);
+    hOnline[1] = home_gauge(hBed, p, 96, pw, ICON_BED, "Bed", 120);
 
-    lv_obj_t* lc = ui_card(p, 6, 190, 236, 84);
+    lv_obj_t* lc = ui_card(p, 6, 186, pw, ph - 180);
+    hOnline[2] = lc;
     lv_obj_set_style_pad_ver(lc, 5, 0);
+    lv_coord_t colW = (pw - 16) / 2;
+    hSlotNameW = colW - 46;
     for (int k = 0; k < HOME_SLOTS; k++) {
-        lv_coord_t x = (k / 3) * 112, y = (k % 3) * 24;  // column by column
+        lv_coord_t x = (k / 3) * colW, y = (k % 3) * 24;  // column by column
         hSlotName[k] = ui_label(lc, "", &lv_font_montserrat_12, COL_DIM);
         lv_obj_set_pos(hSlotName[k], x, y);
         hSlotVal[k] = ui_label(lc, "", &lv_font_montserrat_14);
         lv_obj_set_width(hSlotVal[k], 40);
         lv_obj_set_style_text_align(hSlotVal[k], LV_TEXT_ALIGN_RIGHT, 0);
-        lv_obj_set_pos(hSlotVal[k], x + 64, y - 1);
+        lv_obj_set_pos(hSlotVal[k], x + colW - 46, y - 1);
     }
-    // shown instead of the list while Klipper is down
-    hBtnRow = ui_row(lc, 220, 70);
-    lv_obj_set_pos(hBtnRow, 0, 0);
-    set_bg_color(hBtnRow, COL_CARD, 0);
-    lv_obj_set_style_bg_opa(hBtnRow, LV_OPA_COVER, 0);
-    hBtnRestart = ui_btn(hBtnRow, LV_SYMBOL_REFRESH "\nRestart", 107, 66, restart_cb);
-    hBtnFw = ui_btn(hBtnRow, LV_SYMBOL_REFRESH "\nFW restart", 107, 66, fwrestart_cb, nullptr, COL_ORANGE);
-    lv_obj_set_style_text_font(hBtnRestart, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_font(hBtnFw, &lv_font_montserrat_14, 0);
-    lv_obj_add_flag(hBtnRow, LV_OBJ_FLAG_HIDDEN);
 
+    // offline / Klipper-down status card (same area)
+    hOff = ui_card(p, 6, 6, pw, ph);
+    hOffIcon = ui_label(hOff, "", &lv_font_montserrat_28);
+    hOffTitle = ui_label(hOff, "", &lv_font_montserrat_20);
+    lv_obj_set_pos(hOffTitle, 40, 4);
+    hOffText = ui_label(hOff, "", &lv_font_montserrat_14, COL_TEXT);
+    lv_label_set_long_mode(hOffText, LV_LABEL_LONG_DOT);
+    lv_obj_set_size(hOffText, pw - 16, ph - 16 - 44 - 74);
+    lv_obj_set_pos(hOffText, 0, 44);
+    hOffBtns = ui_row(hOff, pw - 16, 70);
+    lv_obj_align(hOffBtns, LV_ALIGN_BOTTOM_MID, 0, 0);
+    lv_obj_t* rb = ui_btn(hOffBtns, LV_SYMBOL_REFRESH "\nRestart", (pw - 22) / 2, 66, restart_cb);
+    lv_obj_t* fb = ui_btn(hOffBtns, LV_SYMBOL_REFRESH "\nFW restart", (pw - 22) / 2, 66, fwrestart_cb, nullptr, COL_ORANGE);
+    lv_obj_set_style_text_font(rb, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_font(fb, &lv_font_montserrat_14, 0);
+    lv_obj_add_flag(hOff, LV_OBJ_FLAG_HIDDEN);
+
+    // menu
     lv_obj_t* grid = lv_obj_create(p);
-    lv_obj_set_pos(grid, 248, 6);
-    lv_obj_set_size(grid, 226, 268);
+    lv_coord_t gx = PORTRAIT ? 6 : 248, gy = PORTRAIT ? 276 : 6;
+    lv_coord_t gw = PORTRAIT ? CONTENT_W - 12 : 226, gh = CONTENT_H - gy - 6;
+    lv_obj_set_pos(grid, gx, gy);
+    lv_obj_set_size(grid, gw, gh);
     lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(grid, 0, 0);
     lv_obj_set_style_pad_all(grid, 0, 0);
@@ -244,20 +303,21 @@ void scr_home(lv_obj_t* p) {
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
 
-    struct T { const char* icon; const char* txt; Scr s; };
-    static const T tiles[] = {
-        {ICON_PRINTER, "Print", S_FILES},         {ICON_THERMO, "Temp", S_TEMP},        {ICON_POS, "Move", S_MOVE},
-        {ICON_NOZZLE, "Extrude", S_EXTRUDE},      {ICON_FAN, "Fans", S_FANS},           {LV_SYMBOL_LIST, "Macros", S_MACROS},
-        {LV_SYMBOL_KEYBOARD, "Console", S_CONSOLE}, {LV_SYMBOL_POWER, "Power", S_POWER}, {LV_SYMBOL_SETTINGS, "Settings", S_SETTINGS},
-    };
-    for (auto& t : tiles) {
-        lv_obj_t* b = ui_tile(grid, t.icon, t.txt, 72, 86, nullptr, nullptr, t.s == S_FILES ? COL_ACCENT : COL_BTN);
+    static const char* icons[9] = {ICON_PRINTER, ICON_THERMO, ICON_POS, ICON_NOZZLE, ICON_FAN,
+                                   LV_SYMBOL_LIST, LV_SYMBOL_KEYBOARD, LV_SYMBOL_POWER, LV_SYMBOL_SETTINGS};
+    static const char* names[9] = {"Print", "Temp", "Move", "Extrude", "Fans", "Macros", "Console", "Power", "Settings"};
+    lv_coord_t tw = (gw - 10) / 3, th = (gh - 10) / 3;
+    for (int k = 0; k < 9; k++) {
+        Scr s = HOME_TILE_SCR[k];
+        lv_obj_t* b = ui_tile(grid, icons[k], names[k], tw, th, nullptr, nullptr, s == S_FILES ? COL_ACCENT : COL_BTN);
         lv_obj_set_style_text_font(lv_obj_get_child(b, 1), &lv_font_montserrat_12, 0);
+        if (PORTRAIT) lv_obj_set_style_pad_row(b, 1, 0);
         lv_obj_add_event_cb(b, [](lv_event_t* e) {
             Scr s = (Scr)(intptr_t)lv_event_get_user_data(e);
             ui_goto(s == S_FILES && is_printing() ? S_PRINTING : s);
-        }, LV_EVENT_CLICKED, (void*)(intptr_t)t.s);
-        if (t.s == S_FILES) hPrintTile = b;
+        }, LV_EVENT_CLICKED, (void*)(intptr_t)s);
+        hTiles[k] = b;
+        if (s == S_FILES) hPrintTile = b;
     }
     ui_set_update(home_update);
 }
@@ -299,10 +359,10 @@ static void mini_gauge(Gauge& gg, lv_obj_t* c, lv_coord_t x, const char* icon, i
     lv_bar_set_range(gg.bar, 0, 1000);
 }
 
-static void make_tile(Tile& t, lv_obj_t* p, lv_coord_t x, lv_coord_t y, const char* icon, const char* cap) {
+static void make_tile(Tile& t, lv_obj_t* p, lv_coord_t x, lv_coord_t y, lv_coord_t w, const char* icon, const char* cap) {
     lv_obj_t* c = lv_obj_create(p);
     lv_obj_set_pos(c, x, y);
-    lv_obj_set_size(c, 72, 52);
+    lv_obj_set_size(c, w, 52);
     set_bg_color(c, COL_TILE, 0);
     lv_obj_set_style_border_width(c, 0, 0);
     lv_obj_set_style_radius(c, 8, 0);
@@ -373,10 +433,11 @@ static void printing_update() {
 }
 
 void scr_printing(lv_obj_t* p) {
-    // left: progress ring with a hotend icon inside, percentage, state, file name
-    lv_obj_t* l = ui_card(p, 6, 6, 160, 268);
-    pRing = make_arc(l, 144, 10, 270, 360);
-    lv_obj_align(pRing, LV_ALIGN_TOP_MID, 0, 0);
+    // landscape: ring column left, gauges/tiles/actions right; portrait: ring card on top, everything stacked
+    const bool P = PORTRAIT;
+    lv_obj_t* l = P ? ui_card(p, 6, 6, CONTENT_W - 12, 170) : ui_card(p, 6, 6, 160, 268);
+    pRing = make_arc(l, P ? 152 : 144, 10, 270, 360);
+    lv_obj_align(pRing, P ? LV_ALIGN_LEFT_MID : LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_t* box = lv_obj_create(pRing);
     lv_obj_set_size(box, 108, 108);
     set_bg_color(box, COL_BG, 0);
@@ -390,37 +451,50 @@ void scr_printing(lv_obj_t* p) {
     pIcon = ui_label(box, ICON_NOZZLE, &icons_56, COL_DIM);
     lv_obj_center(pIcon);
 
+    const lv_coord_t tw = P ? CONTENT_W - 12 - 16 - 162 : 144;  // text column width
     pPct = ui_label(l, "", &lv_font_montserrat_28);
-    lv_obj_align(pPct, LV_ALIGN_TOP_MID, 0, 146);
     pChip = ui_label(l, "", &lv_font_montserrat_14);
     lv_label_set_long_mode(pChip, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(pChip, 144);
-    lv_obj_set_style_text_align(pChip, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(pChip, LV_ALIGN_TOP_MID, 0, 180);
+    lv_obj_set_width(pChip, tw);
     pName = ui_label(l, "", &lv_font_montserrat_12, COL_DIM);
     lv_label_set_long_mode(pName, LV_LABEL_LONG_DOT);
-    lv_obj_set_size(pName, 144, 30);
-    lv_obj_set_style_text_align(pName, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(pName, LV_ALIGN_TOP_MID, 0, 204);
+    lv_obj_set_size(pName, tw, P ? 46 : 30);
+    if (P) {
+        lv_obj_set_pos(pPct, 162, 12);
+        lv_obj_set_pos(pChip, 162, 54);
+        lv_obj_set_pos(pName, 162, 82);
+    } else {
+        lv_obj_set_style_text_align(pChip, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_set_style_text_align(pName, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(pPct, LV_ALIGN_TOP_MID, 0, 146);
+        lv_obj_align(pChip, LV_ALIGN_TOP_MID, 0, 180);
+        lv_obj_align(pName, LV_ALIGN_TOP_MID, 0, 204);
+    }
 
-    // right top: hotend + bed mini gauges
-    lv_obj_t* gc = ui_card(p, 172, 6, 302, 70);
+    // hotend + bed gauges
+    const lv_coord_t rx = P ? 6 : 172, rw = P ? CONTENT_W - 12 : 302;
+    lv_coord_t y = P ? 182 : 6;
+    lv_obj_t* gc = ui_card(p, rx, y, rw, 70);
     mini_gauge(pExt, gc, 0, ICON_NOZZLE, 300);
-    mini_gauge(pBed, gc, 146, ICON_BED, 120);
+    mini_gauge(pBed, gc, (rw - 16) / 2, ICON_BED, 120);
+    y += 76;
 
     // tiles
     static const char* icons[8] = {ICON_CLOCK, ICON_HOURGLASS, ICON_LAYERS, ICON_Z, ICON_SPEED, ICON_FLOW, ICON_FAN, ICON_FILAMENT};
     static const char* caps[8] = {"Time", "Left", "Layer", "Z", "Speed", "Flow", "Fan", "Fil."};
-    for (int i = 0; i < 8; i++) make_tile(pTiles[i], p, 172 + (i % 4) * 76, 82 + (i / 4) * 56, icons[i], caps[i]);
+    const lv_coord_t tileW = (rw - 12) / 4;
+    for (int i = 0; i < 8; i++) make_tile(pTiles[i], p, rx + (i % 4) * (tileW + 4), y + (i / 4) * 56, tileW, icons[i], caps[i]);
+    y += 114;
 
     // actions
-    lv_obj_t* row = ui_row(p, 302, 78);
-    lv_obj_set_pos(row, 172, 196);
+    const lv_coord_t bh = CONTENT_H - 6 - y;
+    lv_obj_t* row = ui_row(p, rw, bh);
+    lv_obj_set_pos(row, rx, y);
     lv_obj_set_style_pad_column(row, 4, 0);
-    pBtnPause = ui_btn(row, "", 72, 78, pause_cb);
-    pBtnCancel = ui_btn(row, "", 72, 78, cancel_cb, nullptr, COL_RED);
-    lv_obj_t* tune = ui_btn(row, LV_SYMBOL_LOOP "\nTune", 72, 78, goto_cb, (void*)(intptr_t)S_FANS);
-    lv_obj_t* zo = ui_btn(row, LV_SYMBOL_UP LV_SYMBOL_DOWN "\nZ offset", 72, 78, goto_cb, (void*)(intptr_t)S_ZOFFSET);
+    pBtnPause = ui_btn(row, "", tileW, bh, pause_cb);
+    pBtnCancel = ui_btn(row, "", tileW, bh, cancel_cb, nullptr, COL_RED);
+    lv_obj_t* tune = ui_btn(row, LV_SYMBOL_LOOP "\nTune", tileW, bh, goto_cb, (void*)(intptr_t)S_FANS);
+    lv_obj_t* zo = ui_btn(row, LV_SYMBOL_UP LV_SYMBOL_DOWN "\nZ offset", tileW, bh, goto_cb, (void*)(intptr_t)S_ZOFFSET);
     lv_obj_t* btns[] = {pBtnPause, pBtnCancel, tune, zo};
     for (lv_obj_t* b : btns) lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
 

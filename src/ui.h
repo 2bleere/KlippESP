@@ -16,9 +16,12 @@
 #define COL_TEXT    lv_color_hex(0xe6edf3)
 #define COL_DIM     lv_color_hex(0x8b949e)
 
+// Screen size is decided at boot by the orientation setting (480x320 landscape or 320x480 portrait).
+extern bool PORTRAIT;
+extern lv_coord_t SW, SH;  // screen width / height
 #define TOPBAR_H 40
-#define CONTENT_W 480
-#define CONTENT_H 280
+#define CONTENT_W SW
+#define CONTENT_H (SH - TOPBAR_H)
 
 enum Scr {
     S_HOME, S_FILES, S_PRINTING, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,

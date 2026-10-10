@@ -37,12 +37,12 @@ static uint32_t cVer = 0;
 
 static void console_layout(bool kb) {
     if (kb) {
-        lv_obj_set_height(cLogBox, 52);
-        lv_obj_set_y(cRow, 62);
+        lv_obj_set_height(cLogBox, CONTENT_H - KB_H - 54);
+        lv_obj_set_y(cRow, CONTENT_H - KB_H - 42);
         lv_obj_clear_flag(cKb, LV_OBJ_FLAG_HIDDEN);
     } else {
-        lv_obj_set_height(cLogBox, 226);
-        lv_obj_set_y(cRow, 238);
+        lv_obj_set_height(cLogBox, CONTENT_H - 54);
+        lv_obj_set_y(cRow, CONTENT_H - 42);
         lv_obj_add_flag(cKb, LV_OBJ_FLAG_HIDDEN);
     }
     lv_obj_scroll_to_y(cLogBox, LV_COORD_MAX, LV_ANIM_OFF);
@@ -90,18 +90,18 @@ static void console_update() {
 void scr_console(lv_obj_t* p) {
     cLogBox = lv_obj_create(p);
     lv_obj_set_pos(cLogBox, 6, 6);
-    lv_obj_set_size(cLogBox, 468, 226);
+    lv_obj_set_size(cLogBox, CONTENT_W - 12, CONTENT_H - 54);
     set_bg_color(cLogBox, COL_CARD, 0);
     lv_obj_set_style_border_width(cLogBox, 0, 0);
     lv_obj_set_style_pad_all(cLogBox, 6, 0);
     lv_obj_set_scroll_dir(cLogBox, LV_DIR_VER);
     cLog = ui_label(cLogBox, "Loading...", &lv_font_montserrat_12);
     lv_label_set_long_mode(cLog, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(cLog, 446);
+    lv_obj_set_width(cLog, CONTENT_W - 34);
 
-    cRow = ui_row(p, 468, 36);
-    lv_obj_set_pos(cRow, 6, 238);
-    cTa = make_ta(cRow, "G-code, e.g. G28 or QUERY_PROBE", "", 384);
+    cRow = ui_row(p, CONTENT_W - 12, 36);
+    lv_obj_set_pos(cRow, 6, CONTENT_H - 42);
+    cTa = make_ta(cRow, "G-code, e.g. G28 or QUERY_PROBE", "", CONTENT_W - 12 - 84);
     lv_obj_add_event_cb(cTa, console_ta_evt, LV_EVENT_ALL, nullptr);
     lv_obj_t* sb = ui_btn(cRow, "Send", 78, 36, console_send_cb, nullptr, COL_ACCENT);
     lv_obj_set_style_text_font(sb, &lv_font_montserrat_14, 0);
@@ -117,13 +117,21 @@ void scr_console(lv_obj_t* p) {
 static void goto_cb(lv_event_t* e) { ui_goto((Scr)(intptr_t)lv_event_get_user_data(e)); }
 
 void scr_settings(lv_obj_t* p) {
-    lv_obj_t* g2 = ui_row(p, 468, 120);
+    lv_obj_t* g2 = lv_obj_create(p);
     lv_obj_set_pos(g2, 6, 6);
+    lv_obj_set_size(g2, CONTENT_W - 12, PORTRAIT ? 236 : 120);
+    lv_obj_set_style_bg_opa(g2, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(g2, 0, 0);
+    lv_obj_set_style_pad_all(g2, 0, 0);
     lv_obj_set_style_pad_column(g2, 5, 0);
-    ui_tile(g2, LV_SYMBOL_WIFI, "Connection", 113, 110, goto_cb, (void*)(intptr_t)S_CONNECT, COL_ACCENT);
-    ui_tile(g2, LV_SYMBOL_SETTINGS, "System", 113, 110, goto_cb, (void*)(intptr_t)S_SYSTEM);
-    ui_tile(g2, LV_SYMBOL_POWER, "Power devices", 113, 110, goto_cb, (void*)(intptr_t)S_POWER);
-    ui_tile(g2, LV_SYMBOL_KEYBOARD, "Console", 113, 110, goto_cb, (void*)(intptr_t)S_CONSOLE);
+    lv_obj_set_style_pad_row(g2, 5, 0);
+    lv_obj_set_flex_flow(g2, LV_FLEX_FLOW_ROW_WRAP);
+    lv_obj_clear_flag(g2, LV_OBJ_FLAG_SCROLLABLE);
+    const lv_coord_t w = PORTRAIT ? (CONTENT_W - 17) / 2 : 113;
+    ui_tile(g2, LV_SYMBOL_WIFI, "Connection", w, 110, goto_cb, (void*)(intptr_t)S_CONNECT, COL_ACCENT);
+    ui_tile(g2, LV_SYMBOL_SETTINGS, "System", w, 110, goto_cb, (void*)(intptr_t)S_SYSTEM);
+    ui_tile(g2, LV_SYMBOL_POWER, "Power devices", w, 110, goto_cb, (void*)(intptr_t)S_POWER);
+    ui_tile(g2, LV_SYMBOL_KEYBOARD, "Console", w, 110, goto_cb, (void*)(intptr_t)S_CONSOLE);
 }
 
 // ================================================================ CONNECTION
@@ -197,12 +205,13 @@ static void scan_close(lv_event_t*) {
 
 static void show_scan_results(int n) {
     kScanOv = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(kScanOv, LCD_W, LCD_H);
+    lv_obj_set_size(kScanOv, SW, SH);
     set_bg_color(kScanOv, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(kScanOv, LV_OPA_60, 0);
     lv_obj_set_style_border_width(kScanOv, 0, 0);
     lv_obj_set_style_radius(kScanOv, 0, 0);
-    lv_obj_t* c = ui_card(kScanOv, 0, 0, 440, 296);
+    const lv_coord_t sw = PORTRAIT ? 300 : 440, sh = PORTRAIT ? 420 : 296;
+    lv_obj_t* c = ui_card(kScanOv, 0, 0, sw, sh);
     lv_obj_center(c);
     ui_label(c, n > 0 ? "Select network" : "No networks found", &lv_font_montserrat_16);
     lv_obj_t* close = ui_btn(c, LV_SYMBOL_CLOSE, 44, 32, scan_close);
@@ -210,7 +219,7 @@ static void show_scan_results(int n) {
 
     lv_obj_t* list = lv_obj_create(c);
     lv_obj_set_pos(list, 0, 36);
-    lv_obj_set_size(list, 424, 244);
+    lv_obj_set_size(list, sw - 16, sh - 52);
     lv_obj_set_style_bg_opa(list, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(list, 0, 0);
     lv_obj_set_style_pad_all(list, 0, 0);
@@ -225,7 +234,7 @@ static void show_scan_results(int n) {
         for (int j = 0; j < i; j++)
             if (WiFi.SSID(j) == s) dup = true;
         if (dup) continue;
-        lv_obj_t* b = ui_btn(list, s.c_str(), 414, 40, scan_pick);
+        lv_obj_t* b = ui_btn(list, s.c_str(), sw - 26, 40, scan_pick);
         lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
         lv_obj_align(lv_obj_get_child(b, 0), LV_ALIGN_LEFT_MID, 8, 0);
         char r[32];
@@ -274,49 +283,53 @@ static void connect_update() {
 
 void scr_connect(lv_obj_t* p) {
     // Everything that needs typing sits above the keyboard (top CONTENT_H - KB_H px).
+    const bool P = PORTRAIT;
+    const lv_coord_t colW = P ? CONTENT_W - 12 : 230;
+    const lv_coord_t x2 = P ? 6 : 244, y2 = P ? 120 : 0;  // printer column origin
     lv_obj_t* l = ui_label(p, LV_SYMBOL_WIFI " Wi-Fi", &lv_font_montserrat_14, COL_DIM);
     lv_obj_set_pos(l, 8, 2);
-    lv_obj_t* r1 = ui_row(p, 230, 36);
+    lv_obj_t* r1 = ui_row(p, colW, 36);
     lv_obj_set_pos(r1, 6, 20);
     lv_obj_set_style_pad_column(r1, 4, 0);
-    kSsid = make_ta(r1, "Network (SSID)", cfg.ssid, 182);
+    kSsid = make_ta(r1, "Network (SSID)", cfg.ssid, colW - 48);
     kScanBtn = ui_btn(r1, LV_SYMBOL_REFRESH, 44, 36, scan_cb);
-    lv_obj_t* r2 = ui_row(p, 230, 36);
+    lv_obj_t* r2 = ui_row(p, colW, 36);
     lv_obj_set_pos(r2, 6, 60);
     lv_obj_set_style_pad_column(r2, 4, 0);
-    kPass = make_ta(r2, "Password", cfg.pass, 182);
+    kPass = make_ta(r2, "Password", cfg.pass, colW - 48);
     lv_textarea_set_password_mode(kPass, true);
     ui_btn(r2, LV_SYMBOL_EYE_OPEN, 44, 36, eye_cb);
     kWifiSt = ui_label(p, "", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(kWifiSt, 8, 102);
-    lv_obj_set_width(kWifiSt, 228);
+    lv_obj_set_pos(kWifiSt, 8, 100);
+    lv_obj_set_width(kWifiSt, colW - 2);
     lv_label_set_long_mode(kWifiSt, LV_LABEL_LONG_DOT);
 
     lv_obj_t* l2 = ui_label(p, LV_SYMBOL_SETTINGS " Printer (Moonraker)", &lv_font_montserrat_14, COL_DIM);
-    lv_obj_set_pos(l2, 246, 2);
-    kHost = make_ta(p, "Printer IP or hostname", cfg.host, 228);
-    lv_obj_set_pos(kHost, 244, 20);
-    lv_obj_t* r3 = ui_row(p, 228, 36);
-    lv_obj_set_pos(r3, 244, 60);
+    lv_obj_set_pos(l2, x2 + 2, y2 + 2);
+    kHost = make_ta(p, "Printer IP or hostname", cfg.host, colW);
+    lv_obj_set_pos(kHost, x2, y2 + 20);
+    lv_obj_t* r3 = ui_row(p, colW, 36);
+    lv_obj_set_pos(r3, x2, y2 + 60);
     lv_obj_set_style_pad_column(r3, 4, 0);
     char port[8];
     snprintf(port, sizeof(port), "%u", cfg.port);
     kPort = make_ta(r3, "Port", port, 70);
     lv_textarea_set_accepted_chars(kPort, "0123456789");
-    kKey = make_ta(r3, "API key (optional)", cfg.apikey, 154);
+    kKey = make_ta(r3, "API key (optional)", cfg.apikey, colW - 74);
     kMrSt = ui_label(p, "", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(kMrSt, 246, 102);
-    lv_obj_set_width(kMrSt, 228);
+    lv_obj_set_pos(kMrSt, x2 + 2, y2 + 100);
+    lv_obj_set_width(kMrSt, colW - 2);
     lv_label_set_long_mode(kMrSt, LV_LABEL_LONG_DOT);
 
     lv_obj_t* tas[] = {kSsid, kPass, kHost, kPort, kKey};
     for (lv_obj_t* ta : tas) lv_obj_add_event_cb(ta, conn_ta_evt, LV_EVENT_ALL, nullptr);
 
-    lv_obj_t* c = ui_card(p, 6, CONTENT_H - KB_H, 468, KB_H - 6);
+    lv_obj_t* c = ui_card(p, 6, CONTENT_H - KB_H, CONTENT_W - 12, KB_H - 6);
     lv_obj_t* hint = ui_label(c,
-        "Moonraker usually listens on port 7125 (port 80 if it\n"
-        "only works through Mainsail). .local names use mDNS.\n"
-        "API key only needed if this display isn't a trusted client.",
+        P ? "Moonraker port is usually 7125 (80 via\nMainsail). .local names use mDNS. API key\nonly if not a trusted client."
+          : "Moonraker usually listens on port 7125 (port 80 if it\n"
+            "only works through Mainsail). .local names use mDNS.\n"
+            "API key only needed if this display isn't a trusted client.",
         &lv_font_montserrat_12, COL_DIM);
     lv_obj_set_pos(hint, 0, 0);
     lv_obj_t* sb = ui_btn(c, LV_SYMBOL_SAVE "  Save & Connect", 190, 44, save_cb, nullptr, COL_GREEN);
@@ -366,6 +379,20 @@ static void system_update() {
     set_text(sysInfo, buf);
 }
 
+static uint8_t pendingRot;
+static void rot_yes(void*) {
+    cfg.rotation = pendingRot;
+    settings_save();
+    delay(200);
+    ESP.restart();
+}
+static void rot_cb(lv_event_t* e) {
+    uint16_t i = lv_dropdown_get_selected(lv_event_get_target(e));
+    if (i == cfg.rotation) return;
+    pendingRot = i;
+    ui_confirm("Orientation", "Restart the display to apply the new orientation?", rot_yes);
+}
+
 static void bri_cb(lv_event_t* e) {
     lv_obj_t* s = lv_event_get_target(e);
     cfg.brightness = lv_slider_get_value(s);
@@ -374,43 +401,60 @@ static void bri_cb(lv_event_t* e) {
 }
 
 void scr_system(lv_obj_t* p) {
-    lv_obj_t* c = ui_card(p, 6, 6, 236, 268);
+    const bool P = PORTRAIT;
+    // info + screen options card
+    const lv_coord_t cw = P ? CONTENT_W - 12 : 236, ch = P ? 200 : CONTENT_H - 12, iw = cw - 16;
+    lv_obj_t* c = ui_card(p, 6, 6, cw, ch);
     sysInfo = ui_label(c, "", &lv_font_montserrat_12);
     lv_label_set_long_mode(sysInfo, LV_LABEL_LONG_DOT);
-    lv_obj_set_size(sysInfo, 220, 196);
-    lv_obj_t* sl = ui_label(c, "Screen off after", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(sl, 0, 200);
+    lv_obj_set_size(sysInfo, iw, ch - 16 - 56);
+    const lv_coord_t dw = (iw - 6) / 2, dy = ch - 16 - 34;
+    lv_obj_t* sl = ui_label(c, "Screen off", &lv_font_montserrat_12, COL_DIM);
+    lv_obj_set_pos(sl, 0, dy - 18);
+    lv_obj_t* ol = ui_label(c, "Orientation", &lv_font_montserrat_12, COL_DIM);
+    lv_obj_set_pos(ol, dw + 6, dy - 18);
     sysSleep = lv_dropdown_create(c);
-    lv_dropdown_set_options(sysSleep, "Never\n1 minute\n5 minutes\n15 minutes\n30 minutes\n60 minutes");
+    lv_dropdown_set_options(sysSleep, "Never\n1 min\n5 min\n15 min\n30 min\n60 min");
     lv_obj_set_style_text_font(sysSleep, &lv_font_montserrat_14, 0);
-    lv_obj_set_size(sysSleep, 220, 34);
-    lv_obj_set_pos(sysSleep, 0, 218);
+    lv_obj_set_size(sysSleep, dw, 34);
+    lv_obj_set_pos(sysSleep, 0, dy);
     for (int i = 0; i < 6; i++)
         if (sleepOpts[i] == cfg.sleepMin) lv_dropdown_set_selected(sysSleep, i);
     lv_obj_add_event_cb(sysSleep, sleep_cb, LV_EVENT_VALUE_CHANGED, nullptr);
+    lv_obj_t* rot = lv_dropdown_create(c);
+    lv_dropdown_set_options(rot, "Landscape\nPortrait\nLandscape 180\nPortrait 180");
+    lv_obj_set_style_text_font(rot, &lv_font_montserrat_14, 0);
+    lv_obj_set_size(rot, dw, 34);
+    lv_obj_set_pos(rot, dw + 6, dy);
+    lv_dropdown_set_selected(rot, cfg.rotation & 3);
+    lv_obj_add_event_cb(rot, rot_cb, LV_EVENT_VALUE_CHANGED, nullptr);
 
+    // brightness + actions
+    const lv_coord_t rx = P ? 6 : 248, ry = P ? 212 : 6, rw = P ? CONTENT_W - 12 : 226;
     lv_obj_t* r = lv_obj_create(p);
-    lv_obj_set_pos(r, 248, 6);
-    lv_obj_set_size(r, 226, 268);
+    lv_obj_set_pos(r, rx, ry);
+    lv_obj_set_size(r, rw, CONTENT_H - 6 - ry);
     lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(r, 0, 0);
     lv_obj_set_style_pad_all(r, 0, 0);
     lv_obj_set_style_pad_row(r, 4, 0);
-    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_column(r, 4, 0);
+    lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t* br = ui_row(r, 226, 32);
+    lv_obj_t* br = ui_row(r, rw, 32);
     ui_label(br, LV_SYMBOL_IMAGE, &lv_font_montserrat_14, COL_DIM);
     lv_obj_t* bs = lv_slider_create(br);
-    lv_obj_set_size(bs, 190, 10);
+    lv_obj_set_size(bs, rw - 36, 10);
     lv_obj_set_ext_click_area(bs, 14);
     lv_slider_set_range(bs, 10, 255);
     lv_slider_set_value(bs, cfg.brightness, LV_ANIM_OFF);
     lv_obj_add_event_cb(bs, bri_cb, LV_EVENT_VALUE_CHANGED, nullptr);
     lv_obj_add_event_cb(bs, bri_cb, LV_EVENT_RELEASED, nullptr);
 
+    const lv_coord_t bw = P ? (rw - 4) / 2 : rw;
     auto act = [&](const char* t, lv_event_cb_t cb, void* ud, lv_color_t col) {
-        lv_obj_t* b = ui_btn(r, t, 226, 34, cb, ud, col);
+        lv_obj_t* b = ui_btn(r, t, bw, 34, cb, ud, col);
         lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
     };
     act(LV_SYMBOL_REFRESH " Restart Klipper", post_cb, (void*)"/printer/restart", COL_BTN);

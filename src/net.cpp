@@ -160,8 +160,9 @@ static void handle_root() {
     h += "<label>Moonraker port</label><input name=port type=number value=\"" + String(cfg.port) + "\">";
     h += F("<label>API key (optional)</label><input name=apikey type=password placeholder='(unchanged)'>");
     h += F("<label>Display orientation</label><select name=rot>");
-    h += String("<option value=0") + (cfg.rotation == 0 ? " selected" : "") + ">Landscape</option>";
-    h += String("<option value=2") + (cfg.rotation == 2 ? " selected" : "") + ">Landscape (upside down)</option>";
+    static const char* rots[] = {"Landscape", "Portrait", "Landscape (upside down)", "Portrait (upside down)"};
+    for (int i = 0; i < 4; i++)
+        h += "<option value=" + String(i) + (cfg.rotation == i ? " selected>" : ">") + rots[i] + "</option>";
     h += F("</select><small>Changing it restarts the display.</small>");
     h += "<label>Brightness</label><input type=range name=bri min=10 max=255 value=" + String(cfg.brightness) + ">";
     h += F("<button>Save &amp; connect</button></form>"
@@ -201,7 +202,7 @@ static void handle_save() {
     }
     bool rotChanged = false;
     if (server.hasArg("rot")) {
-        uint8_t r = server.arg("rot").toInt() & 2;
+        uint8_t r = server.arg("rot").toInt() & 3;
         rotChanged = r != cfg.rotation;
         cfg.rotation = r;
     }
@@ -241,7 +242,7 @@ static void serial_cmd(String line) {
     else if (k == "host") strlcpy(cfg.host, v.c_str(), sizeof(cfg.host));
     else if (k == "port") cfg.port = v.toInt() > 0 ? v.toInt() : 7125;
     else if (k == "apikey") strlcpy(cfg.apikey, v.c_str(), sizeof(cfg.apikey));
-    else if (k == "rotate") cfg.rotation = v.toInt() & 2;  // 0 or 2; takes effect after save + restart
+    else if (k == "rotate") cfg.rotation = v.toInt() & 3;  // takes effect after save + restart
     else if (k == "bri") board_set_brightness(cfg.brightness = constrain(v.toInt(), 10, 255));
     else if (k == "save") {
         settings_save();
@@ -253,7 +254,7 @@ static void serial_cmd(String line) {
         log_status("status");
         return;
     } else if (k != "show") {
-        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0|2 bri=10..255 save show status");
+        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 bri=10..255 save show status");
         return;
     }
     Serial.printf("OK ssid='%s' pass=%s host='%s' port=%u apikey=%s wifi=%s ip=%s\n", cfg.ssid,

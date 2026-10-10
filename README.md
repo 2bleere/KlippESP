@@ -11,7 +11,10 @@
 - Build / flash over USB: `pio run -e wt32_sc01 -t upload`
 - Over the air: set `upload_port` in `[env:wt32_sc01_ota]`, then `pio run -e wt32_sc01_ota -t upload`
 - Display + touch driver: LovyanGFX (SPI sclk 14, mosi 13, dc 21, cs 15, rst 22; backlight PWM 23; touch I2C sda 18, scl 19, int 39, addr 0x38)
-- Screens are laid out for 480×320; orientation can be flipped 180° (settings page)
+- Every screen has a landscape (480×320) and a portrait (320×480) layout; choose the orientation (incl. 180° flips) on the
+  display (Settings → System → Orientation) or the web settings page; the display restarts to apply it
+- When the printer is unavailable (no Wi-Fi, Moonraker offline, Klipper down) Home shows a status card with only
+  Settings and Power (plus Restart / FW restart while Klipper is down)
 - Brightness: Settings → System slider, or the settings web page
 - No PSRAM: no print thumbnails (a hotend icon sits in the progress ring); about 118 KB RAM stays free
 - During firmware updates the screen shows a real progress bar (the ST7796 keeps its own frame memory)

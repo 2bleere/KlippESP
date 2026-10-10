@@ -110,21 +110,22 @@ static void touch_read(lv_indev_drv_t*, lv_indev_data_t* d) {
 
 void board_init(uint8_t rotation) {
     lcd.init();
-    lcd.setRotation(rotation == 2 ? 3 : 1);  // 1 = landscape, 3 = landscape upside down (touch follows)
+    static const uint8_t lgfxRot[4] = {1, 0, 3, 2};  // our 0..3 -> LovyanGFX (0 = native portrait)
+    lcd.setRotation(lgfxRot[rotation & 3]);
     lcd.setBrightness(0);
     lcd.fillScreen(TFT_BLACK);
 
     lv_init();
-    // one internal, DMA-capable buffer of 20 lines (19 KB); RAM is tight without PSRAM
+    // one internal, DMA-capable buffer of ~9600 px (19 KB); RAM is tight without PSRAM
     static lv_disp_draw_buf_t draw_buf;
-    const size_t buf_px = LCD_W * 20;
+    const size_t buf_px = LCD_LONG * 20;
     lv_color_t* buf = (lv_color_t*)heap_caps_malloc(buf_px * sizeof(lv_color_t), MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
     lv_disp_draw_buf_init(&draw_buf, buf, nullptr, buf_px);
 
     static lv_disp_drv_t disp_drv;
     lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = LCD_W;
-    disp_drv.ver_res = LCD_H;
+    disp_drv.hor_res = lcd.width();   // after setRotation: 480x320 or 320x480
+    disp_drv.ver_res = lcd.height();
     disp_drv.flush_cb = disp_flush;
     disp_drv.draw_buf = &draw_buf;
     lv_disp_drv_register(&disp_drv);

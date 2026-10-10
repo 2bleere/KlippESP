@@ -18,7 +18,7 @@ void settings_load() {
     getStr(p, "apikey", cfg.apikey, sizeof(cfg.apikey), "");
     cfg.port = p.getUShort("port", 7125);
     cfg.sleepMin = p.getUShort("sleep", 0);
-    cfg.rotation = p.getUChar("rot", 0) & 2;
+    cfg.rotation = p.getUChar("rot", 0) & 3;
     cfg.brightness = p.getUChar("bri", 200);
     p.end();
 }

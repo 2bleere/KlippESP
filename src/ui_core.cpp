@@ -6,6 +6,14 @@
 #include "ui_icons.h"
 
 MrState g;
+bool PORTRAIT = false;
+lv_coord_t SW = 480, SH = 320;
+
+static void ui_screen_size() {
+    SW = lv_disp_get_hor_res(nullptr);
+    SH = lv_disp_get_ver_res(nullptr);
+    PORTRAIT = SH > SW;
+}
 
 void ui_icons_init() {
     icons_20.fallback = &lv_font_montserrat_20;
@@ -166,7 +174,7 @@ void ui_ota_progress(int pct) {
     }
     if (!ov) {
         ov = lv_obj_create(lv_layer_top());
-        lv_obj_set_size(ov, LCD_W, LCD_H);
+        lv_obj_set_size(ov, SW, SH);
         lv_obj_set_style_bg_color(ov, COL_BG, 0);
         lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(ov, 0, 0);
@@ -174,10 +182,11 @@ void ui_ota_progress(int pct) {
         lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
         lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_20, COL_TEXT);
         lv_obj_align(t, LV_ALIGN_CENTER, 0, -50);
-        lv_obj_t* s = ui_label(ov, "Do not unplug. The display restarts when done.", &lv_font_montserrat_14, COL_DIM);
+        lv_obj_t* s = ui_label(ov, "Do not unplug.\nThe display restarts when done.", &lv_font_montserrat_14, COL_DIM);
+        lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_align(s, LV_ALIGN_CENTER, 0, -20);
         bar = lv_bar_create(ov);
-        lv_obj_set_size(bar, 360, 14);
+        lv_obj_set_size(bar, SW - 80, 14);
         lv_obj_align(bar, LV_ALIGN_CENTER, 0, 18);
         lv_bar_set_range(bar, 0, 100);
         lbl = ui_label(ov, "", &lv_font_montserrat_20, COL_TEXT);
@@ -215,7 +224,7 @@ static void toast_click(lv_event_t*) {
 void ui_toast(const char* msg, bool error) {
     if (!toast) {
         toast = lv_label_create(lv_layer_top());
-        lv_obj_set_width(toast, LCD_W - 40);
+        lv_obj_set_width(toast, SW - 40);
         lv_label_set_long_mode(toast, LV_LABEL_LONG_WRAP);
         lv_obj_set_style_text_font(toast, &lv_font_montserrat_14, 0);
         lv_obj_set_style_pad_all(toast, 10, 0);
@@ -256,13 +265,13 @@ static void confirm_evt(lv_event_t* e) {
 void ui_confirm(const char* title, const char* text, void (*cb)(void*), void* ud) {
     static const char* btns[] = {"Cancel", "OK", ""};
     lv_obj_t* mb = lv_msgbox_create(nullptr, title, text, btns, false);
-    lv_obj_set_width(mb, 380);
+    lv_obj_set_width(mb, LV_MIN(380, SW - 20));
     lv_obj_set_style_text_font(mb, &lv_font_montserrat_14, 0);
     lv_obj_center(mb);
     lv_obj_t* bm = lv_msgbox_get_btns(mb);
     lv_obj_set_height(bm, 46);
     lv_btnmatrix_set_btn_ctrl_all(bm, LV_BTNMATRIX_CTRL_CLICK_TRIG);
-    lv_obj_set_style_min_width(bm, 300, 0);
+    lv_obj_set_style_min_width(bm, LV_MIN(300, SW - 60), 0);
     lv_obj_add_event_cb(mb, confirm_evt, LV_EVENT_VALUE_CHANGED, new ConfirmCtx{cb, ud});
 }
 
@@ -296,13 +305,13 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
                                 ".", "0", LV_SYMBOL_BACKSPACE, "\n", "Cancel", "OK", ""};
     npCb = cb;
     npOverlay = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(npOverlay, LCD_W, LCD_H);
+    lv_obj_set_size(npOverlay, SW, SH);
     lv_obj_set_style_bg_color(npOverlay, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(npOverlay, LV_OPA_60, 0);
     lv_obj_set_style_border_width(npOverlay, 0, 0);
     lv_obj_set_style_radius(npOverlay, 0, 0);
 
-    lv_obj_t* c = ui_card(npOverlay, 0, 0, 440, 300);
+    lv_obj_t* c = ui_card(npOverlay, 0, 0, PORTRAIT ? 300 : 440, PORTRAIT ? 420 : 300);
     lv_obj_center(c);
     lv_obj_t* l = ui_label(c, title, &lv_font_montserrat_16);
     lv_obj_set_pos(l, 0, 0);
@@ -311,7 +320,7 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
     lv_textarea_set_one_line(npTa, true);
     lv_textarea_set_accepted_chars(npTa, "0123456789.-");
     lv_obj_set_style_text_font(npTa, &lv_font_montserrat_28, 0);
-    lv_obj_set_size(npTa, 150, 54);
+    lv_obj_set_size(npTa, PORTRAIT ? 284 : 150, 54);
     lv_obj_set_pos(npTa, 0, 30);
     char buf[16];
     snprintf(buf, sizeof(buf), "%g", initial);
@@ -319,8 +328,13 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
 
     lv_obj_t* bm = lv_btnmatrix_create(c);
     lv_btnmatrix_set_map(bm, map);
-    lv_obj_set_size(bm, 262, 284);
-    lv_obj_align(bm, LV_ALIGN_RIGHT_MID, 6, 0);
+    if (PORTRAIT) {
+        lv_obj_set_size(bm, 290, 314);
+        lv_obj_align(bm, LV_ALIGN_BOTTOM_MID, 0, 6);
+    } else {
+        lv_obj_set_size(bm, 262, 284);
+        lv_obj_align(bm, LV_ALIGN_RIGHT_MID, 6, 0);
+    }
     lv_obj_set_style_bg_opa(bm, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(bm, 0, 0);
     lv_obj_set_style_pad_all(bm, 2, 0);
@@ -382,7 +396,7 @@ static void temps_cb(lv_event_t*) { ui_goto(S_TEMP); }
 
 static void build_topbar(lv_obj_t* scr) {
     lv_obj_t* bar = lv_obj_create(scr);
-    lv_obj_set_size(bar, LCD_W, TOPBAR_H);
+    lv_obj_set_size(bar, SW, TOPBAR_H);
     lv_obj_set_pos(bar, 0, 0);
     lv_obj_set_style_bg_color(bar, COL_BAR, 0);
     lv_obj_set_style_radius(bar, 0, 0);
@@ -402,16 +416,19 @@ static void build_topbar(lv_obj_t* scr) {
     lv_obj_set_style_pad_ver(lblTitle, 4, 0);
 
     // temps + wifi + E-STOP; tapping the temps opens the temperature screen
-    lv_obj_t* r = ui_row(bar, 236, TOPBAR_H);
+    lv_obj_t* r = ui_row(bar, PORTRAIT ? 90 : 236, TOPBAR_H);
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(r, 8, 0);
     lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(r, temps_cb, LV_EVENT_CLICKED, nullptr);
 
-    lblExt = ui_label(r, "", &icons_20);
-    lv_obj_set_style_text_font(lblExt, &lv_font_montserrat_14, 0);
+    lblExt = ui_label(r, "", &lv_font_montserrat_14);
     lblBed = ui_label(r, "", &lv_font_montserrat_14);
+    if (PORTRAIT) {  // 320 px: temperatures are on Home / Printing anyway
+        lv_obj_add_flag(lblExt, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(lblBed, LV_OBJ_FLAG_HIDDEN);
+    }
     lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_14);
     lv_obj_t* es = ui_btn(r, "STOP", 52, 32, estop_cb, nullptr, COL_RED);
     lv_obj_set_style_text_font(es, &lv_font_montserrat_14, 0);
@@ -475,7 +492,7 @@ static void update_sleep() {
         board_backlight(false);
         // transparent overlay swallows the wake-up touch so it doesn't press a button
         sleepOv = lv_obj_create(lv_layer_top());
-        lv_obj_set_size(sleepOv, LCD_W, LCD_H);
+        lv_obj_set_size(sleepOv, SW, SH);
         lv_obj_set_style_bg_opa(sleepOv, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(sleepOv, 0, 0);
         lv_obj_add_event_cb(sleepOv, wake_cb, LV_EVENT_PRESSED, nullptr);
@@ -524,6 +541,7 @@ extern "C" const lv_img_dsc_t boot_logo;
 extern "C" const uint32_t BOOT_LOGO_BG;
 
 void ui_boot_logo() {
+    ui_screen_size();
     lv_obj_t* scr = lv_scr_act();
     lv_obj_set_style_bg_color(scr, lv_color_hex(BOOT_LOGO_BG), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);

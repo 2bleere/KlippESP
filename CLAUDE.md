@@ -1,8 +1,9 @@
 # KlippESP – notes for working on this repo
 
 > **This is the `wt32-sc01` branch:** touch UI only, for the WT32-SC01 (classic ESP32, 4 MB flash, NO PSRAM,
-> ST7796 480×320 SPI + FT6336U, LovyanGFX). Envs: `wt32_sc01`, `wt32_sc01_ota`. Layout constants: `TOPBAR_H 40`,
-> `CONTENT_W 480`, `CONTENT_H 280`; fonts Montserrat 12/14/16/20/28 + icons_20/28. RAM is the constraint (~118 KB free at
+> ST7796 480×320 SPI + FT6336U, LovyanGFX). Envs: `wt32_sc01`, `wt32_sc01_ota`. Orientation is chosen at boot
+> (`cfg.rotation` 0..3); screen size is runtime: `SW`/`SH`/`PORTRAIT`, `CONTENT_W = SW`, `CONTENT_H = SH - TOPBAR_H`
+> (TOPBAR_H 40). Every builder has a landscape and a portrait branch (`const bool P = PORTRAIT`) — keep both working; fonts Montserrat 12/14/16/20/28 + icons_20/28. RAM is the constraint (~118 KB free at
 > runtime): LVGL has its own 48 KB pool (`lv_conf.h`), Moonraker JSON is parsed straight from the socket with
 > filters (`httpGetJson`), one 480×20 DMA draw buffer, file list capped at 60. No print thumbnails here: a PNG
 > decoder needs ~70 KB and froze the UI. Watch the serial `[stat]` line (heap, largest block, lvgl %, frag %). The Waveshare-specific notes below
