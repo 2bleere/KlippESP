@@ -3,6 +3,7 @@
 #include "ui.h"
 #include "ui_icons.h"
 #include "net.h"
+#include "clock.h"
 #include "board.h"
 #include <WiFi.h>
 #include <vector>
@@ -68,7 +69,7 @@ struct Gauge {
 };
 
 struct Tile {
-    lv_obj_t *icon, *value;
+    lv_obj_t *icon, *value, *cap;
 };
 
 struct Slot {
@@ -82,7 +83,7 @@ struct HostRow {
 #define MAX_SLOTS 12
 static lv_coord_t slotNameW;
 
-static lv_obj_t *dState, *dHost, *dNet;
+static lv_obj_t *dState, *dHost, *dNet, *dClock;
 static Gauge gExt, gBed;
 static Slot slots[MAX_SLOTS];
 static int nSlots;
@@ -196,8 +197,8 @@ static void make_tile(Tile& t, lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_
     lv_obj_set_style_pad_all(c, 6, 0);
     lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
     t.icon = ui_label(c, icon, &icons_20, COL_ACCENT);
-    lv_obj_t* cap = ui_label(c, caption, &lv_font_montserrat_14, COL_DIM);
-    lv_obj_align(cap, LV_ALIGN_TOP_RIGHT, 0, 2);
+    t.cap = ui_label(c, caption, &lv_font_montserrat_14, COL_DIM);
+    lv_obj_align(t.cap, LV_ALIGN_TOP_RIGHT, 0, 2);
     t.value = ui_label(c, "", &lv_font_montserrat_20);
     lv_obj_align(t.value, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 }
@@ -365,6 +366,18 @@ static void update_header() {
     if (g.wifi) snprintf(buf, sizeof(buf), "%s  Display: %s", wifi_icon(), WiFi.localIP().toString().c_str());
     else snprintf(buf, sizeof(buf), "%s  Display: --", wifi_icon());
     set_text(dNet, buf);
+    char hm[16] = "";
+    if (clock_hm(hm, sizeof(hm))) {
+        time_t t = time(nullptr);
+        struct tm tmv;
+        localtime_r(&t, &tmv);
+        char d[8];
+        strftime(d, sizeof(d), "%a", &tmv);
+        snprintf(buf, sizeof(buf), ICON_CLOCK " %s %s", d, hm);
+    } else {
+        buf[0] = 0;
+    }
+    set_text(dClock, buf);
     set_text_color(dNet, g.wifi ? COL_TEXT : COL_RED);
 }
 
@@ -453,6 +466,11 @@ static void update_job() {
     set_text(tiles[0].value, a);
     fmt_dur(a, sizeof(a), remain);
     set_text(tiles[1].value, is_printing() && g.progress > 0.005f ? a : "-");
+    // caption shows the wall-clock finish time once NTP has synced
+    char eta[24] = "Remaining", hm[16];
+    if (is_printing() && g.progress > 0.005f && clock_hm(hm, sizeof(hm), time(nullptr) + (time_t)remain))
+        snprintf(eta, sizeof(eta), "ETA %s", hm);
+    set_text(tiles[1].cap, eta);
     if (g.layers > 0) snprintf(buf, sizeof(buf), "%d/%d", g.layer, g.layers);
     else snprintf(buf, sizeof(buf), "-");
     set_text(tiles[2].value, buf);
@@ -606,15 +624,18 @@ static void build_header(lv_obj_t* scr) {
     dHost = ui_label(bar, "", &icons_20, COL_DIM);
     lv_label_set_long_mode(dHost, LV_LABEL_LONG_DOT);
     dNet = ui_label(bar, "", &icons_20);
-    if (!L.portrait) {
+    dClock = ui_label(bar, "", &icons_20);
+    if (!L.portrait) {  // state | printer IP | clock | display IP
         lv_obj_align(dState, LV_ALIGN_LEFT_MID, 0, 0);
-        lv_obj_set_width(dHost, 300);
+        lv_obj_set_width(dHost, 230);
         lv_obj_align(dHost, LV_ALIGN_LEFT_MID, 190, 0);
+        lv_obj_align(dClock, LV_ALIGN_LEFT_MID, 430, 0);
         lv_obj_align(dNet, LV_ALIGN_RIGHT_MID, 0, 0);
-    } else {  // two rows: state + display IP, then printer IP
+    } else {  // two rows: state + display IP, then clock + printer IP
         lv_obj_align(dState, LV_ALIGN_TOP_LEFT, 0, 8);
         lv_obj_align(dNet, LV_ALIGN_TOP_RIGHT, 0, 14);
-        lv_obj_set_width(dHost, L.W - 24);
+        lv_obj_align(dClock, LV_ALIGN_TOP_LEFT, 0, 54);
+        lv_obj_set_width(dHost, L.W - 24 - 130);
         lv_obj_set_style_text_align(dHost, LV_TEXT_ALIGN_RIGHT, 0);  // both IPs right-aligned
         lv_obj_align(dHost, LV_ALIGN_TOP_RIGHT, 0, 54);
     }

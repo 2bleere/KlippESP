@@ -45,6 +45,12 @@ pio run -e waveshare_s3_lcd7 -t upload
 
 If the upload doesn't start, hold **BOOT**, tap **RESET**, release BOOT, and retry.
 
+## Date & time
+
+NTP client with a configurable server (default `pool.ntp.org`), a list of common time zones with automatic DST (or a
+custom POSIX rule) and 12/24 h, set on the web settings page or over serial (`ntp=`, `tz=`, `clock24=`). The dashboard
+header shows the day and time, the print view shows the ETA, file details show "done ~", and file dates are local.
+
 ## Setup
 
 - **Setup hotspot / captive portal:** without Wi-Fi settings, or after 60 s without a connection, the display opens the Wi-Fi network **`KlippESP-Setup`**. Join it and the settings page opens automatically (otherwise browse to `http://192.168.4.1`). Choose your network, enter the password, the printer's IP, port **7125**, and the display orientation.

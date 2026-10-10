@@ -2,6 +2,7 @@
 #include "settings.h"
 #include "moonraker.h"
 #include "ui.h"
+#include "clock.h"
 #include "web_logo.h"
 #include <WiFi.h>
 #include <WebServer.h>
@@ -163,6 +164,21 @@ static void handle_root() {
     for (int i = 0; i < 4; i++)
         h += "<option value=" + String(i) + (cfg.rotation == i ? " selected>" : ">") + rots[i] + "</option>";
     h += F("</select><small>Portrait applies to the status dashboard (no-touch mode). Changing it restarts the display.</small>");
+    // date & time
+    int zi = clock_zone_index();
+    h += F("<h3 style='margin-top:28px'>Date &amp; time</h3><label>Time zone</label><select name=tzsel id=tzsel "
+           "onchange=\"document.getElementById('tzc').style.display=this.value=='custom'?'block':'none'\">");
+    for (int i = 0; i < TZ_ZONE_COUNT; i++)
+        h += "<option value=" + String(i) + (zi == i ? " selected>" : ">") + TZ_ZONES[i].name + "</option>";
+    h += String("<option value=custom") + (zi < 0 ? " selected" : "") + ">Custom (POSIX TZ rule)</option></select>";
+    h += "<div id=tzc style='display:" + String(zi < 0 ? "block" : "none") + "'><label>Custom TZ rule</label><input name=tz value=\"" +
+         esc(cfg.tz) + "\" placeholder='e.g. EST5EDT,M3.2.0,M11.1.0'></div>";
+    h += "<label>Clock</label><select name=c24><option value=1" + String(cfg.clock24 ? " selected" : "") +
+         ">24-hour</option><option value=0" + String(cfg.clock24 ? "" : " selected") + ">12-hour</option></select>";
+    h += "<label>NTP server</label><input name=ntp value=\"" + esc(cfg.ntp) + "\" placeholder='pool.ntp.org'>";
+    char now[32];
+    clock_datetime(now, sizeof(now));
+    h += "<small>Now: " + String(clock_valid() ? now : "not synced yet") + "</small>";
     h += F("<button>Save &amp; connect</button></form>"
            "<h3 style='margin-top:32px'>Firmware update</h3><form method=post action=/update enctype=multipart/form-data "
            "onsubmit=\"this.querySelector('button').textContent='Uploading\u2026 (about 30 s)';\">"
@@ -194,6 +210,26 @@ static void handle_save() {
     int port = server.arg("port").toInt();
     cfg.port = port > 0 && port < 65536 ? port : 7125;
     if (server.arg("apikey").length()) strlcpy(cfg.apikey, server.arg("apikey").c_str(), sizeof(cfg.apikey));
+    bool timeChanged = false;
+    if (server.hasArg("tzsel")) {
+        String sel = server.arg("tzsel");
+        String tz = sel == "custom" ? server.arg("tz") : String(TZ_ZONES[constrain(sel.toInt(), 0, TZ_ZONE_COUNT - 1)].posix);
+        tz.trim();
+        if (tz.length() && tz != cfg.tz) {
+            strlcpy(cfg.tz, tz.c_str(), sizeof(cfg.tz));
+            timeChanged = true;
+        }
+    }
+    if (server.hasArg("ntp")) {
+        String n = server.arg("ntp");
+        n.trim();
+        if (!n.length()) n = "pool.ntp.org";
+        if (n != cfg.ntp) {
+            strlcpy(cfg.ntp, n.c_str(), sizeof(cfg.ntp));
+            timeChanged = true;
+        }
+    }
+    if (server.hasArg("c24")) cfg.clock24 = server.arg("c24") == "1";
     bool rotChanged = false;
     if (server.hasArg("rot")) {
         uint8_t r = server.arg("rot").toInt() & 3;
@@ -212,6 +248,7 @@ static void handle_save() {
                            "it's connected; after that the settings page is at the display's IP address (shown on screen)."
                          : String("<a style='color:#2f81f7' href='/'>Back to settings</a>")) +
                     "</p></body>");
+    if (timeChanged) clock_apply();
     if (rotChanged) {  // the display layout is built for one orientation at boot
         delay(500);
         ESP.restart();
@@ -237,9 +274,13 @@ static void serial_cmd(String line) {
     else if (k == "port") cfg.port = v.toInt() > 0 ? v.toInt() : 7125;
     else if (k == "apikey") strlcpy(cfg.apikey, v.c_str(), sizeof(cfg.apikey));
     else if (k == "rotate") cfg.rotation = v.toInt() & 3;  // takes effect after save + restart
+    else if (k == "ntp") strlcpy(cfg.ntp, v.c_str(), sizeof(cfg.ntp));
+    else if (k == "tz") strlcpy(cfg.tz, v.c_str(), sizeof(cfg.tz));  // POSIX rule
+    else if (k == "clock24") cfg.clock24 = v.toInt() != 0;
     else if (k == "save") {
         settings_save();
         mr_reconfigure();
+        clock_apply();
         net_reconnect();
         Serial.println("OK saved, reconnecting");
         return;
@@ -247,7 +288,7 @@ static void serial_cmd(String line) {
         log_status("status");
         return;
     } else if (k != "show") {
-        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 save show status");
+        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 ntp= tz= clock24=0|1 save show status");
         return;
     }
     Serial.printf("OK ssid='%s' pass=%s host='%s' port=%u apikey=%s wifi=%s ip=%s\n", cfg.ssid,
@@ -372,6 +413,9 @@ void net_loop() {
     if (otaStarted) ArduinoOTA.handle();
 
     bool connected = WiFi.status() == WL_CONNECTED;
+    static bool wasConnected = false;
+    if (connected && !wasConnected) clock_apply();  // (re)start NTP on every (re)connect
+    wasConnected = connected;
     static uint32_t connectedAt = 0, lastLog = 0;
     if (!connected) connectedAt = 0;
     else {

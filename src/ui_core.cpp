@@ -3,6 +3,7 @@
 #include "board.h"
 #include <WiFi.h>
 #include "net.h"
+#include "clock.h"
 #include "ui_icons.h"
 
 MrState g;
@@ -15,6 +16,7 @@ static lv_obj_t* lblExt;
 static lv_obj_t* lblBed;
 static lv_obj_t* lblState;
 static lv_obj_t* lblWifi;
+static lv_obj_t* lblClock;
 
 static void (*upd)() = nullptr;
 static Scr cur = S_COUNT;
@@ -386,7 +388,7 @@ static void build_topbar(lv_obj_t* scr) {
     lblTitle = ui_label(bar, "", &lv_font_montserrat_20);
     lv_obj_set_pos(lblTitle, 140, 17);
 
-    lv_obj_t* r = ui_row(bar, 430, 56);
+    lv_obj_t* r = ui_row(bar, 500, 56);
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, -6, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(r, 12, 0);
@@ -396,6 +398,7 @@ static void build_topbar(lv_obj_t* scr) {
     lblExt = ui_label(r, "", &lv_font_montserrat_16);
     lblBed = ui_label(r, "", &lv_font_montserrat_16);
     lblState = ui_label(r, "", &lv_font_montserrat_16);
+    lblClock = ui_label(r, "", &lv_font_montserrat_16);
     lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_16);
     lv_obj_t* es = ui_btn(r, "E-STOP", 92, 44, estop_cb, nullptr, COL_RED);
     lv_obj_set_style_text_font(es, &lv_font_montserrat_16, 0);
@@ -415,6 +418,8 @@ static void update_topbar() {
     set_text(lblState, st);
     set_text_color(lblState, state_color(st));
     set_text_color(lblWifi, g.wifi ? COL_GREEN : COL_RED);
+    char hm[16];
+    set_text(lblClock, clock_hm(hm, sizeof(hm)) ? hm : "");
 }
 
 // ---------------------------------------------------------------- screen sleep

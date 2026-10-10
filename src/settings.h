@@ -9,6 +9,9 @@ struct Settings {
     char apikey[72];    // optional Moonraker API key
     uint16_t sleepMin;  // backlight off after N minutes idle, 0 = never
     uint8_t rotation;   // 0 landscape, 1 portrait, 2 landscape flipped, 3 portrait flipped
+    char ntp[64];       // NTP server
+    char tz[64];        // POSIX TZ string, e.g. "EST5EDT,M3.2.0,M11.1.0"
+    bool clock24;       // 24 h clock (else 12 h)
 };
 
 extern Settings cfg;

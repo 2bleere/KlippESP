@@ -1,6 +1,7 @@
 // File browser, file details, print status and Z offset screens.
 #include "ui.h"
 #include "board.h"
+#include "clock.h"
 #include <time.h>
 
 // ---------------------------------------------------------------- thumbnail holder
@@ -140,10 +141,13 @@ static void detail_update() {
         char t[24], buf[320];
         if (m.valid) {
             fmt_dur(t, sizeof(t), m.estTime);
+            char done[24] = "", hm[16];
+            if (m.estTime > 0 && clock_hm(hm, sizeof(hm), time(nullptr) + (time_t)m.estTime))
+                snprintf(done, sizeof(done), " (done ~%s)", hm);
             snprintf(buf, sizeof(buf),
-                     "Print time:  %s\nFilament:  %.2f m%s\nLayers:  %d\nHeight:  %.1f mm\n"
+                     "Print time:  %s%s\nFilament:  %.2f m%s\nLayers:  %d\nHeight:  %.1f mm\n"
                      "Temps:  %d / %d " DEG "C\nSlicer:  %s",
-                     m.estTime > 0 ? t : "-", m.filamentMm / 1000.0f,
+                     m.estTime > 0 ? t : "-", done, m.filamentMm / 1000.0f,
                      m.filamentG > 0 ? (String("  (") + String(m.filamentG, 1) + " g)").c_str() : "",
                      m.layers, m.height, m.extTemp, m.bedTemp, m.slicer[0] ? m.slicer : "-");
         } else {
@@ -186,7 +190,7 @@ static void files_rebuild() {
 
         time_t t = f.modified;
         struct tm tmv;
-        gmtime_r(&t, &tmv);
+        localtime_r(&t, &tmv);  // TZ from settings (clock.cpp)
         char d[32];
         strftime(d, sizeof(d), "%Y-%m-%d %H:%M", &tmv);
         snprintf(buf, sizeof(buf), "%s   %.1f MB", d, f.size / 1048576.0f);
