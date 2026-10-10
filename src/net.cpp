@@ -348,6 +348,13 @@ void net_begin() {
     server.on("/", HTTP_GET, handle_root);
     server.on("/save", HTTP_POST, handle_save);
     server.on("/scan", HTTP_GET, handle_scan);
+    server.on("/info", HTTP_GET, [] {  // build + memory facts for remote checks
+        char b[200];
+        snprintf(b, sizeof(b), "{\"idf\":\"%s\",\"built\":\"%s %s\",\"uptime_s\":%lu,\"heap_int\":%u,\"heap_psram\":%u}",
+                 ESP.getSdkVersion(), __DATE__, __TIME__, (unsigned long)(millis() / 1000),
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL), (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+        server.send(200, "application/json", b);
+    });
     server.on("/favicon.ico", HTTP_GET, [] { server.send_P(200, "image/png", (PGM_P)WEB_LOGO_PNG, WEB_LOGO_PNG_LEN); });
     server.on("/logo.png", HTTP_GET, [] {
         server.sendHeader("Cache-Control", "max-age=86400");

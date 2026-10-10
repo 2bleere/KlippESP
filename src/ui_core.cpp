@@ -152,42 +152,45 @@ void set_height(lv_obj_t* o, lv_coord_t h) {
 // ---------------------------------------------------------------- firmware update overlay
 
 void ui_ota_progress(int pct) {
-    // Flash writes during an update starve the panel's PSRAM frame buffer and make any image flicker, and
-    // this panel blanks as soon as its refresh stops. So: show a message for a few seconds (before any
-    // flash is written), then stop the refresh and switch the backlight off until the display restarts.
-    static bool dark = false;
-    if (pct <= -100) {  // update failed: restart to bring the screen back (old firmware)
-        delay(200);
-        ESP.restart();
+    // The RGB panel streams from PSRAM through internal bounce buffers, and code runs from PSRAM, so flash
+    // writes no longer disturb the image: show real progress while the update is written.
+    static lv_obj_t *ov, *bar, *lbl;
+    static int last = -2;
+    if (pct <= -100) {  // update failed: back to the normal screens
+        if (ov) lv_obj_del(ov);
+        ov = nullptr;
+        last = -2;
+        return;
     }
-    if (dark) return;
-    dark = true;
-
-    lv_obj_t* ov = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(ov, lv_disp_get_hor_res(nullptr), lv_disp_get_ver_res(nullptr));
-    lv_obj_set_style_bg_color(ov, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(ov, 0, 0);
-    lv_obj_set_style_radius(ov, 0, 0);
-    lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
-    // wrap within the screen width so the text also fits in portrait (480 px)
-    lv_coord_t tw = lv_disp_get_hor_res(nullptr) - 48;
-    lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_32, COL_TEXT);
-    lv_label_set_long_mode(t, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(t, tw);
-    lv_obj_set_style_text_align(t, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(t, LV_ALIGN_CENTER, 0, -50);
-    lv_obj_t* s = ui_label(ov, "The screen turns off during the update and comes back when the display restarts. "
-                               "Do not unplug.", &lv_font_montserrat_20, COL_DIM);
-    lv_label_set_long_mode(s, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(s, LV_MIN(tw, 560));
-    lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_update_layout(ov);  // wrapped label heights are needed before stacking the subtitle
-    lv_obj_align_to(s, t, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
-    lv_refr_now(nullptr);
-    delay(4000);  // readable pause; no flash has been written yet
-    board_backlight(false);
-    board_lcd_freeze();
+    if (!ov) {
+        lv_coord_t w = lv_disp_get_hor_res(nullptr), h = lv_disp_get_ver_res(nullptr);
+        ov = lv_obj_create(lv_layer_top());
+        lv_obj_set_size(ov, w, h);
+        lv_obj_set_style_bg_color(ov, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(ov, LV_OPA_COVER, 0);
+        lv_obj_set_style_border_width(ov, 0, 0);
+        lv_obj_set_style_radius(ov, 0, 0);
+        lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_32, COL_TEXT);
+        lv_obj_align(t, LV_ALIGN_CENTER, 0, -80);
+        lv_obj_t* s = ui_label(ov, "Do not unplug.\nThe display restarts when done.", &lv_font_montserrat_20, COL_DIM);
+        lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
+        lv_obj_align(s, LV_ALIGN_CENTER, 0, -26);
+        bar = lv_bar_create(ov);
+        lv_obj_set_size(bar, LV_MIN(w - 80, 560), 20);
+        lv_obj_align(bar, LV_ALIGN_CENTER, 0, 30);
+        lv_bar_set_range(bar, 0, 100);
+        lbl = ui_label(ov, "", &lv_font_montserrat_32, COL_TEXT);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 80);
+    }
+    if (pct >= 0 && pct < 100 && last >= 0 && pct - last < 2) return;
+    if (pct == last) return;
+    last = pct;
+    char buf[16];
+    snprintf(buf, sizeof(buf), pct < 0 ? "Starting..." : "%d%%", pct);
+    lv_label_set_text(lbl, buf);
+    lv_bar_set_value(bar, pct < 0 ? 0 : pct, LV_ANIM_OFF);
+    lv_refr_now(nullptr);  // the main loop is busy receiving firmware
 }
 
 // ---------------------------------------------------------------- toast

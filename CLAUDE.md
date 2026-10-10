@@ -1,5 +1,14 @@
 # KlippESP – notes for working on this repo
 
+> **This is the `idf5-migration` branch:** Waveshare on Arduino core 3.3.11 / ESP-IDF 5.5 (pioarduino 55.03.311).
+> `custom_sdkconfig` enables XIP from PSRAM + IRAM-safe RGB ISR; `board.cpp` drives the panel through `esp_lcd`
+> with bounce buffers (no Arduino_GFX), so flash writes no longer disturb the image and the update screen shows real
+> progress. Build with **PlatformIO Core 6.1.19** (`~/.pio61/bin/pio`): Core 6.2 wants SCons 4.11 and fights the
+> platform's 4.8 (`ModuleNotFoundError: SCons.Tool.FortranCommon`). If that error appears, reinstall
+> `pio pkg install -g -t "platformio/tool-scons@~4.40801.0"`. First build rebuilds the core libs (~15 min).
+> `default_16MB.csv` is in the repo because the hybrid build doesn't find the stock one. `/info` returns IDF version,
+> build time, uptime and free heap.
+
 ESP32-S3 firmware (Arduino core 2.0.14 / ESP-IDF 4.4, PlatformIO, LVGL 8.3, Arduino_GFX 1.4.7, ArduinoJson 7) that shows
 Klipper status from Moonraker over Wi-Fi on a Waveshare ESP32-S3-Touch-LCD-7 (800×480 RGB565, N16R8).
 

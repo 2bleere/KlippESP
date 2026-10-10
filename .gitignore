@@ -1,2 +1,7 @@
 .pio/
 .vscode/
+
+# pioarduino custom_sdkconfig build artifacts
+.dummy/
+managed_components/
+sdkconfig.*

@@ -1,12 +1,12 @@
 #include "board.h"
 #include <Arduino.h>
 #include <Wire.h>
-#include <Arduino_GFX_Library.h>
 #include <lvgl.h>
 #include <stdarg.h>
-#include "soc/lcd_cam_struct.h"
+#include "esp_lcd_panel_rgb.h"
+#include "esp_lcd_panel_ops.h"
 
-static Arduino_ESP32RGBPanel* panel;
+static esp_lcd_panel_handle_t panel;
 
 // log to both native USB (Serial) and the UART port (Serial0)
 static void logf(const char* fmt, ...) {
@@ -18,7 +18,6 @@ static void logf(const char* fmt, ...) {
     Serial.print(buf);
     Serial0.print(buf);
 }
-static Arduino_RGB_Display* gfx;
 
 // ---------------- CH422G ----------------
 static uint8_t exio = 0;
@@ -45,10 +44,7 @@ bool board_backlight_on() { return exio & EXIO_LCD_BL; }
 static uint8_t gt_addr;
 bool board_has_touch() { return gt_addr != 0; }
 
-void board_lcd_freeze() {
-    LCD_CAM.lcd_user.lcd_start = 0;   // same as IDF's lcd_ll_stop()
-    LCD_CAM.lcd_user.lcd_update = 1;
-}
+void board_lcd_freeze() {}  // no longer needed: bounce buffers + XIP from PSRAM keep the panel running
 
 // ---------------- GT911 ----------------
 
@@ -125,7 +121,7 @@ static void touch_read(lv_indev_drv_t*, lv_indev_data_t* d) {
 
 // ---------------- LVGL display ----------------
 static void disp_flush(lv_disp_drv_t* drv, const lv_area_t* a, lv_color_t* px) {
-    gfx->draw16bitRGBBitmap(a->x1, a->y1, (uint16_t*)&px->full, a->x2 - a->x1 + 1, a->y2 - a->y1 + 1);
+    esp_lcd_panel_draw_bitmap(panel, a->x1, a->y1, a->x2 + 1, a->y2 + 1, px);
     lv_disp_flush_ready(drv);
 }
 
@@ -164,17 +160,44 @@ void board_init(uint8_t rotation) {
         if (i2c_probe(a) && (a < 0x20 || (a > 0x27 && a < 0x30) || a > 0x3F)) logf(" 0x%02X", a);
     logf("  (expander state 0x%02X)\n", exio);
 
-    panel = new Arduino_ESP32RGBPanel(
-        5 /* DE */, 3 /* VSYNC */, 46 /* HSYNC */, 7 /* PCLK */,
-        1 /* R3 */, 2 /* R4 */, 42 /* R5 */, 41 /* R6 */, 40 /* R7 */,
-        39 /* G2 */, 0 /* G3 */, 45 /* G4 */, 48 /* G5 */, 47 /* G6 */, 21 /* G7 */,
-        14 /* B3 */, 38 /* B4 */, 18 /* B5 */, 17 /* B6 */, 10 /* B7 */,
-        0 /* hsync_polarity */, 8 /* front */, 4 /* pulse */, 8 /* back */,
-        0 /* vsync_polarity */, 8 /* front */, 4 /* pulse */, 8 /* back */,
-        1 /* pclk_active_neg */, LCD_PCLK_HZ);
-    gfx = new Arduino_RGB_Display(LCD_W, LCD_H, panel, 0, true);
-    gfx->begin();
-    gfx->fillScreen(0x0000);
+    // RGB panel via ESP-IDF. The frame buffer lives in PSRAM, but the LCD DMA reads from two small bounce
+    // buffers in internal RAM that the CPU refills; with XIP from PSRAM (see platformio.ini) that keeps
+    // working while flash is written, so the picture stays stable during firmware updates.
+    esp_lcd_rgb_panel_config_t pc = {};
+    pc.clk_src = LCD_CLK_SRC_DEFAULT;
+    pc.timings.pclk_hz = LCD_PCLK_HZ;
+    pc.timings.h_res = LCD_W;
+    pc.timings.v_res = LCD_H;
+    pc.timings.hsync_pulse_width = 4;
+    pc.timings.hsync_back_porch = 8;
+    pc.timings.hsync_front_porch = 8;
+    pc.timings.vsync_pulse_width = 4;
+    pc.timings.vsync_back_porch = 8;
+    pc.timings.vsync_front_porch = 8;
+    pc.timings.flags.hsync_idle_low = 1;
+    pc.timings.flags.vsync_idle_low = 1;
+    pc.timings.flags.pclk_active_neg = 1;
+    pc.data_width = 16;
+    pc.bits_per_pixel = 16;
+    pc.num_fbs = 1;
+    pc.bounce_buffer_size_px = LCD_W * 10;
+    pc.hsync_gpio_num = 46;
+    pc.vsync_gpio_num = 3;
+    pc.de_gpio_num = 5;
+    pc.pclk_gpio_num = 7;
+    pc.disp_gpio_num = -1;
+    static const int data_pins[16] = {14, 38, 18, 17, 10,       // B3..B7
+                                      39, 0, 45, 48, 47, 21,    // G2..G7
+                                      1, 2, 42, 41, 40};        // R3..R7
+    for (int i = 0; i < 16; i++) pc.data_gpio_nums[i] = data_pins[i];
+    pc.flags.fb_in_psram = 1;
+    esp_err_t err = esp_lcd_new_rgb_panel(&pc, &panel);
+    if (err != ESP_OK) logf("RGB panel init failed: %s\n", esp_err_to_name(err));
+    esp_lcd_panel_reset(panel);
+    esp_lcd_panel_init(panel);
+    void* fb = nullptr;
+    esp_lcd_rgb_panel_get_frame_buffer(panel, 1, &fb);
+    if (fb) memset(fb, 0, LCD_W * LCD_H * 2);
 
     lv_init();
     static lv_disp_draw_buf_t draw_buf;
