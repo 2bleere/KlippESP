@@ -371,8 +371,8 @@ static void update_header() {
         time_t t = time(nullptr);
         struct tm tmv;
         localtime_r(&t, &tmv);
-        char d[8];
-        strftime(d, sizeof(d), "%a", &tmv);
+        char d[16];  // portrait shares its row with the printer IP: skip the weekday there
+        strftime(d, sizeof(d), L.portrait ? "%b %e" : "%a %b %e", &tmv);
         snprintf(buf, sizeof(buf), ICON_CLOCK " %s %s", d, hm);
     } else {
         buf[0] = 0;
@@ -640,7 +640,7 @@ static void build_header(lv_obj_t* scr) {
         lv_obj_align(dState, LV_ALIGN_TOP_LEFT, 0, 8);
         lv_obj_align(dNet, LV_ALIGN_TOP_RIGHT, 0, 14);
         lv_obj_align(dClock, LV_ALIGN_TOP_LEFT, 0, 54);
-        lv_obj_set_width(dHost, L.W - 24 - 130);
+        lv_obj_set_width(dHost, L.W - 24 - 180);
         lv_obj_set_style_text_align(dHost, LV_TEXT_ALIGN_RIGHT, 0);  // both IPs right-aligned
         lv_obj_align(dHost, LV_ALIGN_TOP_RIGHT, 0, 54);
     }
