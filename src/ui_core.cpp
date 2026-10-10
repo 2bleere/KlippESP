@@ -25,10 +25,9 @@ static lv_obj_t* content;
 static lv_obj_t* lblTitle;
 static lv_obj_t* btnBack;
 static lv_obj_t* btnHome;
-static lv_obj_t* lblExt;
-static lv_obj_t* lblBed;
 static lv_obj_t* lblWifi;
 static lv_obj_t* lblClock;
+#define TOPBAR_RIGHT_W (PORTRAIT ? 150 : 236)  // clock + wifi + STOP
 
 static void (*upd)() = nullptr;
 static Scr cur = S_COUNT;
@@ -366,6 +365,12 @@ static void build(Scr s) {
         lv_obj_clear_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
     }
     lv_obj_set_pos(lblTitle, s == S_HOME ? 8 : 98, badge ? 7 : 11);
+    // never run into the clock: titles that don't fit end in "..."
+    lv_label_set_long_mode(lblTitle, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(lblTitle, LV_SIZE_CONTENT);
+    lv_obj_update_layout(lblTitle);
+    lv_coord_t maxw = SW - TOPBAR_RIGHT_W - 8 - (s == S_HOME ? 8 : 98);
+    if (lv_obj_get_width(lblTitle) > maxw) lv_obj_set_width(lblTitle, maxw);
     lv_obj_set_style_bg_opa(lblTitle, badge ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     if (badge) update_badge();
     builders[s](content);
@@ -394,7 +399,7 @@ static void estop_cb(lv_event_t*) {
     mr_post("/printer/emergency_stop");
     ui_toast("Emergency stop sent", true);
 }
-static void temps_cb(lv_event_t*) { ui_goto(S_TEMP); }
+static void clock_cb(lv_event_t*) { ui_goto(S_TIME); }
 
 static void build_topbar(lv_obj_t* scr) {
     lv_obj_t* bar = lv_obj_create(scr);
@@ -417,21 +422,15 @@ static void build_topbar(lv_obj_t* scr) {
     lv_obj_set_style_pad_hor(lblTitle, 10, 0);
     lv_obj_set_style_pad_ver(lblTitle, 4, 0);
 
-    // temps + wifi + E-STOP; tapping the temps opens the temperature screen
-    lv_obj_t* r = ui_row(bar, PORTRAIT ? 120 : 270, TOPBAR_H);
+    // date/time + wifi + E-STOP (temperatures live in the Home / Printing cards); tap the clock for Date & Time
+    lv_obj_t* r = ui_row(bar, TOPBAR_RIGHT_W, TOPBAR_H);
     lv_obj_align(r, LV_ALIGN_RIGHT_MID, -4, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(r, 6, 0);
     lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(r, temps_cb, LV_EVENT_CLICKED, nullptr);
+    lv_obj_add_event_cb(r, clock_cb, LV_EVENT_CLICKED, nullptr);
 
-    lblExt = ui_label(r, "", &lv_font_montserrat_14);
-    lblBed = ui_label(r, "", &lv_font_montserrat_14);
-    if (PORTRAIT) {  // 320 px: temperatures are on Home / Printing anyway
-        lv_obj_add_flag(lblExt, LV_OBJ_FLAG_HIDDEN);
-        lv_obj_add_flag(lblBed, LV_OBJ_FLAG_HIDDEN);
-    }
-    lblClock = ui_label(r, "", &lv_font_montserrat_14);
+    lblClock = ui_label(r, "", &lv_font_montserrat_16);
     lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_14);
     lv_obj_t* es = ui_btn(r, "STOP", 50, 32, estop_cb, nullptr, COL_RED);
     lv_obj_set_style_text_font(es, &lv_font_montserrat_14, 0);
@@ -466,19 +465,22 @@ static void update_badge() {
 
 static void update_topbar() {
     if (cur == S_HOME || cur == S_PRINTING) update_badge();
-    char buf[48];
-    snprintf(buf, sizeof(buf), "E %.0f/%.0f" DEG, g.ext.temp, g.ext.target);
-    set_text(lblExt, g.ready ? buf : "");
-    if (g.hasBed && g.ready) {
-        snprintf(buf, sizeof(buf), "B %.0f/%.0f" DEG, g.bed.temp, g.bed.target);
-        set_text(lblBed, buf);
-    } else {
-        set_text(lblBed, "");
-    }
     set_text_color(lblWifi, g.wifi ? COL_GREEN : COL_RED);
-    char hm[16];
-    clock_hm(hm, sizeof(hm));
-    set_text(lblClock, clock_valid() ? hm : "");
+    // "Fri 10 Oct  23:15" (landscape) / "23:15" (portrait); empty until NTP has synced
+    char buf[40] = "", hm[16];
+    if (clock_hm(hm, sizeof(hm))) {
+        if (PORTRAIT) {
+            strlcpy(buf, hm, sizeof(buf));
+        } else {
+            time_t t = time(nullptr);
+            struct tm tmv;
+            localtime_r(&t, &tmv);
+            char d[20];
+            strftime(d, sizeof(d), "%a %d %b", &tmv);
+            snprintf(buf, sizeof(buf), "%s  %s", d, hm);
+        }
+    }
+    set_text(lblClock, buf);
 }
 
 // ---------------------------------------------------------------- screen sleep
