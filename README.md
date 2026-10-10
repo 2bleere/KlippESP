@@ -13,7 +13,7 @@
 - Display + touch driver: LovyanGFX (SPI sclk 14, mosi 13, dc 21, cs 15, rst 22; backlight PWM 23; touch I2C sda 18, scl 19, int 39, addr 0x38)
 - Screens are laid out for 480×320; orientation can be flipped 180° (settings page)
 - Brightness: Settings → System slider, or the settings web page
-- No PSRAM: print thumbnails use the slicer's small thumbnail (≤ 120 px); about 140 KB RAM stays free
+- No PSRAM: no print thumbnails (a hotend icon sits in the progress ring); about 118 KB RAM stays free
 - During firmware updates the screen shows a real progress bar (the ST7796 keeps its own frame memory)
 
 ---
