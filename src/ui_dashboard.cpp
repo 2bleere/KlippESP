@@ -625,12 +625,17 @@ static void build_header(lv_obj_t* scr) {
     lv_label_set_long_mode(dHost, LV_LABEL_LONG_DOT);
     dNet = ui_label(bar, "", &icons_20);
     dClock = ui_label(bar, "", &icons_20);
-    if (!L.portrait) {  // state | printer IP | clock | display IP
+    if (!L.portrait) {  // state | printer IP over display IP (smaller) | clock on the right
         lv_obj_align(dState, LV_ALIGN_LEFT_MID, 0, 0);
-        lv_obj_set_width(dHost, 230);
-        lv_obj_align(dHost, LV_ALIGN_LEFT_MID, 190, 0);
-        lv_obj_align(dClock, LV_ALIGN_LEFT_MID, 430, 0);
-        lv_obj_align(dNet, LV_ALIGN_RIGHT_MID, 0, 0);
+        // fixed column just past the widest badge ("Print error"), so badge changes never move the IPs
+        lv_obj_set_style_text_font(dHost, &icons_16, 0);
+        lv_obj_set_style_text_font(dNet, &icons_16, 0);
+        lv_obj_set_width(dHost, 400);
+        lv_label_set_long_mode(dNet, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(dNet, 400);
+        lv_obj_align(dHost, LV_ALIGN_LEFT_MID, 190, -10);
+        lv_obj_align(dNet, LV_ALIGN_LEFT_MID, 190, 10);
+        lv_obj_align(dClock, LV_ALIGN_RIGHT_MID, 0, 0);
     } else {  // two rows: state + display IP, then clock + printer IP
         lv_obj_align(dState, LV_ALIGN_TOP_LEFT, 0, 8);
         lv_obj_align(dNet, LV_ALIGN_TOP_RIGHT, 0, 14);
