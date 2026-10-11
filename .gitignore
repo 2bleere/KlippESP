@@ -5,3 +5,4 @@
 .dummy/
 managed_components/
 sdkconfig.*
+src/idf_component.yml
