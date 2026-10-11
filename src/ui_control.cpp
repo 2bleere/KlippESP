@@ -501,34 +501,38 @@ void scr_macros(lv_obj_t* p) {
 // ================================================================ POWER DEVICES
 
 static lv_obj_t* pwSw[MR_MAX_POWER];
+static lv_obj_t* pwCol;
 static int pwCount;
 static char pwPending[32];
 
 static void power_yes(void*) { mr_power_toggle(pwPending); }
 
-static void power_cb(lv_event_t* e) {
-    int i = (int)(intptr_t)lv_event_get_user_data(e);
-    if (i >= g.nPower) return;
+static void power_confirm(int i) {
+    if (i < 0 || i >= g.nPower) return;
     strlcpy(pwPending, g.power[i].name, sizeof(pwPending));
     char msg[80];
     snprintf(msg, sizeof(msg), "Turn %s %s?", pwPending, g.power[i].on ? "OFF" : "ON");
     ui_confirm("Power device", msg, power_yes);
 }
 
-static void power_update() {
-    for (int i = 0; i < pwCount && i < g.nPower; i++) {
-        if (g.power[i].on) lv_obj_add_state(pwSw[i], LV_STATE_CHECKED);
-        else lv_obj_clear_state(pwSw[i], LV_STATE_CHECKED);
-    }
+static void power_cb(lv_event_t* e) { power_confirm((int)(intptr_t)lv_event_get_user_data(e)); }
+
+// Home's Power tile: with a single device, toggle it (after confirming) instead of opening the list.
+void ui_power_open() {
+    if (g.nPower == 1) power_confirm(0);
+    else ui_goto(S_POWER);
 }
 
-void scr_power(lv_obj_t* p) {
-    lv_obj_t* col = make_scroll_col(p, 6, 6, CONTENT_W - 12, CONTENT_H - 12);
+static void power_build() {
+    lv_obj_clean(pwCol);
     pwCount = g.nPower;
-    if (!pwCount) ui_label(col, "No power devices configured in Moonraker\n([power ...] sections in moonraker.conf)",
-                           &lv_font_montserrat_14, COL_DIM);
+    if (!pwCount) {
+        ui_label(pwCol, g.online ? "No power devices configured in Moonraker\n([power ...] sections in moonraker.conf)"
+                                 : "Moonraker is not reachable", &lv_font_montserrat_14, COL_DIM);
+        return;
+    }
     for (int i = 0; i < pwCount; i++) {
-        lv_obj_t* b = ui_btn(col, "", CONTENT_W - 24, 50, power_cb, (void*)(intptr_t)i, COL_CARD);
+        lv_obj_t* b = ui_btn(pwCol, "", CONTENT_W - 24, 50, power_cb, (void*)(intptr_t)i, COL_CARD);
         lv_obj_t* l = lv_obj_get_child(b, 0);
         set_text(l, g.power[i].name);
         lv_obj_align(l, LV_ALIGN_LEFT_MID, 12, 0);
@@ -537,5 +541,18 @@ void scr_power(lv_obj_t* p) {
         lv_obj_align(pwSw[i], LV_ALIGN_RIGHT_MID, -12, 0);
         lv_obj_clear_flag(pwSw[i], LV_OBJ_FLAG_CLICKABLE);
     }
+}
+
+static void power_update() {
+    if (g.nPower != pwCount) power_build();  // devices arrive after the screen was opened
+    for (int i = 0; i < pwCount && i < g.nPower; i++) {
+        if (g.power[i].on) lv_obj_add_state(pwSw[i], LV_STATE_CHECKED);
+        else lv_obj_clear_state(pwSw[i], LV_STATE_CHECKED);
+    }
+}
+
+void scr_power(lv_obj_t* p) {
+    pwCol = make_scroll_col(p, 6, 6, CONTENT_W - 12, CONTENT_H - 12);
+    power_build();
     ui_set_update(power_update);
 }

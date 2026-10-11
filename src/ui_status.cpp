@@ -137,7 +137,7 @@ static void goto_cb(lv_event_t* e) { ui_goto((Scr)(intptr_t)lv_event_get_user_da
 // ================================================================ HOME
 
 static Gauge hExt, hBed;
-static lv_obj_t* hPrintTile;
+static lv_obj_t *hPrintTile, *hPowerTile;
 #define HOME_SLOTS 8  // 2 columns x 4 rows; the last host rows are reserved
 static lv_obj_t *hSlotName[HOME_SLOTS], *hSlotVal[HOME_SLOTS];
 static lv_coord_t hSlotNameW;
@@ -207,6 +207,11 @@ static void home_update() {
     set_visible(hOff, !up);
     for (int k = 0; k < 9; k++)
         set_visible(hTiles[k], up || HOME_TILE_SCR[k] == S_SETTINGS || HOME_TILE_SCR[k] == S_POWER);
+    if (hPowerTile) {  // one device: the tile is its switch, so show its state
+        bool one = g.nPower == 1;
+        set_text(lv_obj_get_child(hPowerTile, 1), one ? (g.power[0].on ? "Power: on" : "Power: off") : "Power");
+        set_text_color(lv_obj_get_child(hPowerTile, 0), one && g.power[0].on ? COL_GREEN : COL_TEXT);
+    }
     if (!up) {
         home_offline();
         return;
@@ -336,10 +341,12 @@ void scr_home(lv_obj_t* p) {
         if (PORTRAIT) lv_obj_set_style_pad_row(b, 1, 0);
         lv_obj_add_event_cb(b, [](lv_event_t* e) {
             Scr s = (Scr)(intptr_t)lv_event_get_user_data(e);
-            ui_goto(s == S_FILES && is_printing() ? S_PRINTING : s);
+            if (s == S_POWER) ui_power_open();
+            else ui_goto(s == S_FILES && is_printing() ? S_PRINTING : s);
         }, LV_EVENT_CLICKED, (void*)(intptr_t)s);
         hTiles[k] = b;
         if (s == S_FILES) hPrintTile = b;
+        if (s == S_POWER) hPowerTile = b;
     }
     ui_set_update(home_update);
 }

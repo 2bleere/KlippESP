@@ -79,6 +79,7 @@ void scr_extrude(lv_obj_t* p);
 void scr_fans(lv_obj_t* p);
 void scr_macros(lv_obj_t* p);
 void scr_power(lv_obj_t* p);
+void ui_power_open();  // Home Power tile: toggle the only device, or open the list
 void scr_console(lv_obj_t* p);
 void scr_settings(lv_obj_t* p);
 void scr_connect(lv_obj_t* p);

@@ -479,6 +479,8 @@ static void pollTask(void*) {
             { Lock l; online = S.online; }
             if (online) pollHost(tick);
             else sysInfoLoaded = false;
+            // power devices matter most while Klipper is down (printer switched off by its plug)
+            if (online && tick % 5 == 0) pollPower();
             bool ready;
             { Lock l; ready = !strcmp(S.klippy, "ready"); }
             if (ready && loadObjects()) {
