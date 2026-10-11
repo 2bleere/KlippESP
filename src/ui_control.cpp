@@ -507,9 +507,14 @@ static char pwPending[32];
 
 static void power_yes(void*) { mr_power_toggle(pwPending); }
 
+// Ask first only while a print runs (cutting power would ruin it); otherwise toggle right away.
 static void power_confirm(int i) {
     if (i < 0 || i >= g.nPower) return;
     strlcpy(pwPending, g.power[i].name, sizeof(pwPending));
+    if (!is_printing()) {
+        mr_power_toggle(pwPending);
+        return;
+    }
     char msg[80];
     snprintf(msg, sizeof(msg), "Turn %s %s?", pwPending, g.power[i].on ? "OFF" : "ON");
     ui_confirm("Power device", msg, power_yes);
@@ -517,7 +522,7 @@ static void power_confirm(int i) {
 
 static void power_cb(lv_event_t* e) { power_confirm((int)(intptr_t)lv_event_get_user_data(e)); }
 
-// Home's Power tile: with a single device, toggle it (after confirming) instead of opening the list.
+// Home's Power tile: with a single device, toggle it instead of opening the list.
 void ui_power_open() {
     if (g.nPower == 1) power_confirm(0);
     else ui_goto(S_POWER);

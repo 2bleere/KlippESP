@@ -163,7 +163,11 @@ void set_height(lv_obj_t* o, lv_coord_t h) {
 
 // ---------------------------------------------------------------- firmware update overlay
 
+static void screen_wake();
+
 void ui_ota_progress(int pct) {
+    screen_wake();  // a sleeping screen must show the update
+    lv_disp_trig_activity(nullptr);
     // The ST7796 keeps its own frame memory, so flash writes don't disturb the image: show real progress.
     static lv_obj_t *ov, *bar, *lbl;
     static int last = -2;
@@ -494,11 +498,16 @@ static void wake_cb(lv_event_t*) {
     sleepOv = nullptr;
 }
 
+static void screen_wake() {
+    if (sleepOv) wake_cb(nullptr);
+    else if (!board_backlight_on()) board_backlight(true);
+}
+
 static void update_sleep() {
     if (!cfg.sleepMin) return;
     // Stay on for the whole print (paused included); the timeout starts counting once the job ends.
     if (g.ready && is_printing()) {
-        if (sleepOv) wake_cb(nullptr);
+        screen_wake();
         lv_disp_trig_activity(nullptr);
         return;
     }
