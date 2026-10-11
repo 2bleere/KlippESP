@@ -1,2 +1,9 @@
 .pio/
 .vscode/
+
+# pioarduino build artifacts (from the Waveshare custom_sdkconfig build)
+.dummy/
+managed_components/
+sdkconfig.*
+src/idf_component.yml
+default_16MB.csv
