@@ -53,6 +53,8 @@ void ui_print_thumb(lv_obj_t* img, lv_coord_t box) {
     }
 }
 
+bool ui_print_thumb_shown() { return printThumb.t.data && printThumb.t.len && !strcmp(printThumbFile, g.file); }
+
 static const char* basename_of(const char* p) {
     const char* s = strrchr(p, '/');
     return s ? s + 1 : p;

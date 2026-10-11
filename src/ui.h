@@ -86,3 +86,4 @@ bool is_printing();  // printing or paused
 void scr_dashboard(lv_obj_t* scr);
 // show the current print's thumbnail in img (scaled to fit box px); call periodically
 void ui_print_thumb(lv_obj_t* img, lv_coord_t box);
+bool ui_print_thumb_shown();  // the running job has a thumbnail loaded

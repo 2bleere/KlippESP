@@ -88,7 +88,7 @@ static Gauge gExt, gBed;
 static Slot slots[MAX_SLOTS];
 static int nSlots;
 static lv_obj_t *dPrint, *dIdle;
-static lv_obj_t *dRing, *dImg, *dFile, *dPct, *dChip;
+static lv_obj_t *dRing, *dImg, *dCube, *dFile, *dPct, *dChip;
 static lv_coord_t thumbBox;
 static Tile tiles[8];
 static lv_obj_t *dBigIcon, *dIdleTitle, *dIdleText;
@@ -440,6 +440,7 @@ static void update_list() {
 static void update_job() {
     char buf[64], a[24];
     ui_print_thumb(dImg, thumbBox - 16);
+    set_visible(dCube, !ui_print_thumb_shown());  // previews have transparent backgrounds
     const char* f = strrchr(g.file, '/');
     String fn = f ? f + 1 : g.file;
     int dot = fn.lastIndexOf('.');
@@ -678,7 +679,8 @@ static void build_print_panel(lv_obj_t* m, lv_coord_t iw, lv_coord_t ih) {
     lv_obj_set_style_radius(box, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_clip_corner(box, true, 0);
     lv_obj_center(box);
-    lv_obj_center(ui_label(box, ICON_CUBE, L.portrait ? &icons_28 : &icons_72, COL_DIM));
+    dCube = ui_label(box, ICON_CUBE, L.portrait ? &icons_28 : &icons_72, COL_DIM);  // placeholder without a preview
+    lv_obj_center(dCube);
     dImg = lv_img_create(box);
     lv_obj_center(dImg);
 
