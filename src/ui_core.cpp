@@ -496,6 +496,12 @@ static void wake_cb(lv_event_t*) {
 
 static void update_sleep() {
     if (!cfg.sleepMin) return;
+    // Stay on for the whole print (paused included); the timeout starts counting once the job ends.
+    if (g.ready && is_printing()) {
+        if (sleepOv) wake_cb(nullptr);
+        lv_disp_trig_activity(nullptr);
+        return;
+    }
     if (!sleepOv && lv_disp_get_inactive_time(nullptr) > (uint32_t)cfg.sleepMin * 60000UL) {
         board_backlight(false);
         // transparent overlay swallows the wake-up touch so it doesn't press a button
