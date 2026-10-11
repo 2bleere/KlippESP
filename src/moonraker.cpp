@@ -265,6 +265,45 @@ static void readTemp(JsonObject o, MrTemp& t) {
     t.power = o["power"] | t.power;
 }
 
+// Layer info for the running job. Klipper only knows it when the slicer emits SET_PRINT_STATS_INFO (OrcaSlicer
+// and others don't by default), so fall back to Mainsail's estimate from the gcode Z and the file's layer heights.
+static float gcodeZ;
+static struct {
+    char file[128];
+    float layerH, firstH, height;
+    int layers;
+} job;
+
+static void pollJobMeta(const char* file) {
+    strlcpy(job.file, file, sizeof(job.file));
+    job.layerH = job.firstH = job.height = 0;
+    job.layers = 0;
+    if (!file[0]) return;
+    JsonDocument filter;
+    JsonObject fr = filter["result"].to<JsonObject>();
+    for (const char* k : {"layer_height", "first_layer_height", "object_height", "layer_count"}) fr[k] = true;
+    JsonDocument d;
+    if (httpGetJson("/server/files/metadata?filename=" + urlEnc(file, false), d, &filter, 6000) != 200) return;
+    JsonObject r = d["result"];
+    job.layerH = r["layer_height"] | 0.0f;
+    job.firstH = r["first_layer_height"] | job.layerH;
+    job.height = r["object_height"] | 0.0f;
+    job.layers = r["layer_count"] | 0;
+}
+
+static void estimateLayers() {  // call under the lock, after parseStatus
+    if (S.layers > 0 || job.layerH <= 0 || strcmp(job.file, S.file)) return;
+    // total from the object height (like Mainsail) so it matches the Z-based current layer; the slicer's
+    // layer_count can differ (OrcaSlicer counts 286 where Z reaches 243 for 48.6 mm at 0.2 mm)
+    int total = job.height > 0 ? (int)ceilf((job.height - job.firstH) / job.layerH + 1 - 0.001f) : job.layers;
+    if (total <= 0) return;
+    S.layers = total;
+    bool active = !strcmp(S.pstate, "printing") || !strcmp(S.pstate, "paused");
+    int cur = active && gcodeZ > 0 ? (int)ceilf((gcodeZ - job.firstH) / job.layerH + 1 - 0.001f) : 0;
+    if (!strcmp(S.pstate, "complete")) cur = total;
+    S.layer = constrain(cur, 0, total);
+}
+
 static void parseStatus(JsonObject st) {
     Lock l;
     JsonObject o;
@@ -303,6 +342,8 @@ static void parseStatus(JsonObject st) {
         S.absolute = o["absolute_coordinates"] | true;
         JsonArray h = o["homing_origin"];
         if (h.size() > 2) S.zOffset = h[2];
+        JsonArray gp = o["gcode_position"];
+        if (gp.size() > 2) gcodeZ = gp[2];
     }
     o = st["idle_timeout"];
     if (!o.isNull()) strlcpy(S.idle, o["state"] | "", sizeof(S.idle));
@@ -345,6 +386,11 @@ static void pollStatus() {
     }
     { Lock l; S.online = true; }
     parseStatus(d["result"]["status"]);
+    char file[128];
+    { Lock l; strlcpy(file, S.file, sizeof(file)); }
+    if (strcmp(file, job.file)) pollJobMeta(file);
+    Lock l;
+    estimateLayers();
 }
 
 static void pollConsole() {
