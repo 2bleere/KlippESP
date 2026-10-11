@@ -37,13 +37,16 @@ A red **E-STOP** is always in the top bar.
 
 ## Build & first flash
 
-Install [PlatformIO](https://platformio.org/), connect the board by USB, then:
+Install [PlatformIO](https://platformio.org/) **Core 6.1.19** (the pioarduino platform for Arduino core 3.3 /
+ESP-IDF 5.5 doesn't work with Core 6.2: `pip install platformio==6.1.19`), connect the board by USB, then:
 
 ```bash
 pio run -e waveshare_s3_lcd7 -t upload
 ```
 
 If the upload doesn't start, hold **BOOT**, tap **RESET**, release BOOT, and retry.
+The first build rebuilds the Arduino core libraries with custom ESP-IDF options (code runs from PSRAM so the panel
+keeps refreshing during updates); it downloads ESP-IDF and takes about 15 minutes. Later builds are fast.
 
 ## Date & time
 
@@ -73,7 +76,7 @@ After the first USB flash:
 - **Browser:** settings page → **Firmware update** → upload `.pio/build/waveshare_s3_lcd7/firmware.bin`.
 - **curl:** `curl -F fw=@.pio/build/waveshare_s3_lcd7/firmware.bin http://<display-ip>/update`
 
-During an update the display shows a message for a few seconds, then turns the screen off until it restarts. Settings are kept. These endpoints are open to your LAN, so keep the display on a trusted network.
+During an update the display shows a progress bar and restarts when done. Settings are kept. These endpoints are open to your LAN, so keep the display on a trusted network.
 
 ## Previewing without a printer
 
@@ -105,7 +108,7 @@ Pins and timings are in [src/board.h](src/board.h).
 ## Layout
 
 ```
-src/board.*         RGB panel (Arduino_GFX), GT911 touch, CH422G, LVGL driver
+src/board.*         RGB panel (esp_lcd, bounce buffers), GT911 touch, CH422G, LVGL driver
 src/moonraker.*     background HTTP polling, commands, thumbnails, host stats
 src/net.*           Wi-Fi, setup hotspot + captive portal, settings page, OTA, serial config
 src/settings.*      settings stored in NVS
