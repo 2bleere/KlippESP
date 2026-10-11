@@ -172,6 +172,10 @@ static void handle_root() {
         h += "<option value=" + String(m) + (cfg.sleepMin == m ? " selected>" : ">") +
              (m ? String(m) + (m == 1 ? " minute" : " minutes") : String("Never")) + "</option>";
     h += F("</select><small>Touch the screen to wake it. It stays on while printing.</small>");
+    h += "<label><input type=checkbox name=pwrrst value=1 style='width:auto;margin-right:8px'" +
+         String(cfg.powerRestart ? " checked" : "") + ">Restart Klipper after power on</label>"
+         "<input type=hidden name=pwrrst_f value=1><small>After switching a Moonraker power device on from the display, "
+         "send a firmware restart once the printer has booted (skipped if Moonraker already restarted it).</small>";
     // date & time
     int zi = clock_zone_index();
     h += F("<h3 style='margin-top:28px'>Date &amp; time</h3><label>Time zone</label><select name=tzsel id=tzsel "
@@ -242,6 +246,7 @@ static void handle_save() {
         cfg.brightness = constrain(server.arg("bri").toInt(), 10, 255);
         board_set_brightness(cfg.brightness);
     }
+    if (server.hasArg("pwrrst_f")) cfg.powerRestart = server.hasArg("pwrrst");  // unchecked boxes aren't sent
     if (server.hasArg("sleep")) cfg.sleepMin = constrain(server.arg("sleep").toInt(), 0, 1440);
     bool rotChanged = false;
     if (server.hasArg("rot")) {
@@ -288,6 +293,7 @@ static void serial_cmd(String line) {
     else if (k == "apikey") strlcpy(cfg.apikey, v.c_str(), sizeof(cfg.apikey));
     else if (k == "rotate") cfg.rotation = v.toInt() & 3;  // takes effect after save + restart
     else if (k == "bri") board_set_brightness(cfg.brightness = constrain(v.toInt(), 10, 255));
+    else if (k == "pwrrestart") cfg.powerRestart = v.toInt() != 0;
     else if (k == "sleep") cfg.sleepMin = constrain(v.toInt(), 0, 1440);  // minutes, 0 = never
     else if (k == "ntp") strlcpy(cfg.ntp, v.c_str(), sizeof(cfg.ntp));
     else if (k == "tz") strlcpy(cfg.tz, v.c_str(), sizeof(cfg.tz));  // POSIX rule
@@ -303,7 +309,7 @@ static void serial_cmd(String line) {
         log_status("status");
         return;
     } else if (k != "show") {
-        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 bri=10..255 sleep=min ntp= tz= clock24=0|1 save show status");
+        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 bri=10..255 sleep=min pwrrestart=0|1 ntp= tz= clock24=0|1 save show status");
         return;
     }
     Serial.printf("OK ssid='%s' pass=%s host='%s' port=%u apikey=%s wifi=%s ip=%s\n", cfg.ssid,

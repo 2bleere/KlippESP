@@ -546,6 +546,25 @@ static void power_build() {
         lv_obj_align(pwSw[i], LV_ALIGN_RIGHT_MID, -12, 0);
         lv_obj_clear_flag(pwSw[i], LV_OBJ_FLAG_CLICKABLE);
     }
+    // option: firmware-restart Klipper after switching a device on (the printer board needs it after power loss)
+    lv_obj_t* row = lv_obj_create(pwCol);
+    lv_obj_set_size(row, CONTENT_W - 24, 50);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_t* l = ui_label(row, "Restart Klipper after power on", &lv_font_montserrat_14, COL_DIM);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(l, CONTENT_W - 24 - 84);
+    lv_obj_align(l, LV_ALIGN_LEFT_MID, 12, 0);
+    lv_obj_t* sw = lv_switch_create(row);
+    lv_obj_set_size(sw, 60, 30);
+    lv_obj_align(sw, LV_ALIGN_RIGHT_MID, -12, 0);
+    if (cfg.powerRestart) lv_obj_add_state(sw, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(sw, [](lv_event_t* e) {
+        cfg.powerRestart = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+        settings_save();
+    }, LV_EVENT_VALUE_CHANGED, nullptr);
 }
 
 static void power_update() {

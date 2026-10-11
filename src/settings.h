@@ -13,6 +13,7 @@ struct Settings {
     char ntp[64];       // NTP server
     char tz[64];        // POSIX TZ string, e.g. "EST5EDT,M3.2.0,M11.1.0"
     bool clock24;       // 24 h clock (else 12 h)
+    bool powerRestart;  // firmware-restart Klipper after a power device is switched on from the display
 };
 
 extern Settings cfg;

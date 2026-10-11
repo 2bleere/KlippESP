@@ -563,6 +563,28 @@ static void doMeta(const char* file, bool storeMeta) {
     }
 }
 
+// After the printer is powered on, Klipper stays in shutdown/error until a firmware restart. Give the board time to
+// boot, then restart it unless something else (Moonraker's restart_klipper_when_powered) already did.
+static void powerOnRestart(const char* device) {
+    bool on = false;
+    {
+        Lock l;
+        for (int i = 0; i < S.nPower; i++)
+            if (!strcmp(S.power[i].name, device)) on = S.power[i].on;
+    }
+    if (!on) return;
+    vTaskDelay(pdMS_TO_TICKS(5000));
+    bool down;
+    {
+        Lock l;
+        down = S.online && (!strcmp(S.klippy, "shutdown") || !strcmp(S.klippy, "error"));
+    }
+    if (!down) return;
+    String out;
+    int code = http("POST", "/printer/firmware_restart", "", &out);
+    if (code != 200) reportError(code, out, "Firmware restart");
+}
+
 static void cmdTask(void*) {
     Cmd c;
     for (;;) {
@@ -586,8 +608,12 @@ static void cmdTask(void*) {
                 break;
             case C_POWER:
                 code = http("POST", "/machine/device_power/device?device=" + urlEnc(c.a, false) + "&action=toggle", "", &out);
-                if (code != 200) reportError(code, out, "Power toggle");
-                else pollPower();
+                if (code != 200) {
+                    reportError(code, out, "Power toggle");
+                    break;
+                }
+                pollPower();
+                if (cfg.powerRestart) powerOnRestart(c.a);
                 break;
             case C_FILES: doFiles(); break;
             case C_META: doMeta(c.a, true); break;
