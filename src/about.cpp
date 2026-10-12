@@ -8,6 +8,9 @@
 #include <esp_idf_version.h>
 #include <esp_arduino_version.h>
 #include <esp_ota_ops.h>
+#if CONFIG_SPIRAM
+#include <esp_psram.h>
+#endif
 
 #if CONFIG_IDF_TARGET_ESP32S3
 static const char* BOARD = "Waveshare ESP32-S3-Touch-LCD-7";
@@ -40,16 +43,21 @@ int about_collect(AboutItem* it, int max) {
     int rev = ESP.getChipRevision();  // IDF 5: major * 100 + minor
     add("Chip", "%s v%d.%d, %d cores, %lu MHz", ESP.getChipModel(), rev / 100, rev % 100, ESP.getChipCores(),
         (unsigned long)ESP.getCpuFreqMHz());
-    if (ESP.getPsramSize())
+    size_t psram = 0;
+#if CONFIG_SPIRAM
+    psram = esp_psram_get_size();  // chip size; ESP.getPsramSize() only counts the heap part (code runs from PSRAM here)
+#endif
+    if (psram)
         add("Memory", "%lu MB flash, %lu MB PSRAM", (unsigned long)(ESP.getFlashChipSize() >> 20),
-            (unsigned long)(ESP.getPsramSize() >> 20));
+            (unsigned long)(psram >> 20));
     else
         add("Memory", "%lu MB flash, no PSRAM", (unsigned long)(ESP.getFlashChipSize() >> 20));
     const esp_partition_t* app = esp_ota_get_running_partition();
     add("Firmware size", "%lu KB of %lu KB", (unsigned long)(ESP.getSketchSize() >> 10),
         (unsigned long)((app ? app->size : 0) >> 10));
     add("Arduino core", "%d.%d.%d", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH);
-    add("ESP-IDF", "%s", esp_get_idf_version());
+    const char* idf = esp_get_idf_version();
+    add("ESP-IDF", "%s", idf[0] == 'v' ? idf + 1 : idf);  // some builds prefix "v"
     add("LVGL", "%d.%d.%d", LVGL_VERSION_MAJOR, LVGL_VERSION_MINOR, LVGL_VERSION_PATCH);
     add("Wi-Fi MAC", "%s", WiFi.macAddress().c_str());
     uint32_t up = millis() / 1000;
