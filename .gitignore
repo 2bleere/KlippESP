@@ -6,4 +6,5 @@
 managed_components/
 sdkconfig.*
 src/idf_component.yml
-default_16MB.csv
+CMakeLists.txt
+dependencies.lock
