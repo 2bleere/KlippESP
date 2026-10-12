@@ -160,6 +160,12 @@ static void handle_root() {
     h += "<label>Moonraker port</label><input name=port type=number value=\"" + String(cfg.port) + "\">";
     h += F("<label>API key (optional)</label><input name=apikey type=password placeholder='(unchanged)'>");
     static const char* rots[] = {"Landscape", "Portrait", "Landscape (upside down)", "Portrait (upside down)"};
+    h += F("<label>Interface</label><select name=ui>");
+    static const char* uis[] = {"Auto (touch UI when a touch panel is found)", "Status dashboard",
+                                "Touch UI (without touch: shows each screen in turn)"};
+    for (int i = 0; i < 3; i++)
+        h += "<option value=" + String(i) + (cfg.uiMode == i ? " selected>" : ">") + uis[i] + "</option>";
+    h += F("</select><small>The touch UI is landscape only. Changing it restarts the display.</small>");
     h += F("<label>Display orientation</label><select name=rot>");
     for (int i = 0; i < 4; i++)
         h += "<option value=" + String(i) + (cfg.rotation == i ? " selected>" : ">") + rots[i] + "</option>";
@@ -236,12 +242,17 @@ static void handle_save() {
         rotChanged = r != cfg.rotation;
         cfg.rotation = r;
     }
+    if (server.hasArg("ui")) {  // interface is chosen at boot too
+        uint8_t u = server.arg("ui").toInt() % 3;
+        rotChanged |= u != cfg.uiMode;
+        cfg.uiMode = u;
+    }
     settings_save();
     mr_reconfigure();
     server.send(200, "text/html",
                 "<!doctype html><meta name=viewport content='width=device-width'><body style='font-family:sans-serif;"
                 "background:#0d1117;color:#e6edf3;padding:24px'><h3>Saved.</h3><p>" +
-                    (rotChanged ? String("The display is restarting with the new orientation. ")
+                    (rotChanged ? String("The display is restarting with the new layout. ")
                                 : String("")) +
                     (apActive || wifiChanged
                          ? "The display is connecting to <b>" + esc(cfg.ssid) + "</b>. The setup hotspot turns off once "
@@ -274,6 +285,7 @@ static void serial_cmd(String line) {
     else if (k == "port") cfg.port = v.toInt() > 0 ? v.toInt() : 7125;
     else if (k == "apikey") strlcpy(cfg.apikey, v.c_str(), sizeof(cfg.apikey));
     else if (k == "rotate") cfg.rotation = v.toInt() & 3;  // takes effect after save + restart
+    else if (k == "ui") cfg.uiMode = v.toInt() % 3;        // 0 auto, 1 dashboard, 2 touch UI; after save + restart
     else if (k == "ntp") strlcpy(cfg.ntp, v.c_str(), sizeof(cfg.ntp));
     else if (k == "tz") strlcpy(cfg.tz, v.c_str(), sizeof(cfg.tz));  // POSIX rule
     else if (k == "clock24") cfg.clock24 = v.toInt() != 0;
@@ -288,7 +300,7 @@ static void serial_cmd(String line) {
         log_status("status");
         return;
     } else if (k != "show") {
-        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 ntp= tz= clock24=0|1 save show status");
+        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 ui=0..2 ntp= tz= clock24=0|1 save show status");
         return;
     }
     Serial.printf("OK ssid='%s' pass=%s host='%s' port=%u apikey=%s wifi=%s ip=%s\n", cfg.ssid,

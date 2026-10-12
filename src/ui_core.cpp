@@ -497,6 +497,14 @@ void ui_boot_logo() {
     lv_refr_now(nullptr);
 }
 
+static void preview_cb(lv_timer_t*) {
+    static const Scr order[] = {S_HOME, S_PRINTING, S_FILES, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,
+                                S_CONSOLE, S_POWER, S_SETTINGS, S_SYSTEM, S_ZOFFSET, S_CONNECT};
+    static int i = 0;
+    i = (i + 1) % (int)(sizeof(order) / sizeof(order[0]));
+    ui_goto(order[i]);
+}
+
 void ui_init() {
     lv_obj_clean(lv_scr_act());  // remove the boot logo
     ui_icons_init();
@@ -508,7 +516,8 @@ void ui_init() {
     lv_obj_set_style_bg_color(scr, COL_BG, 0);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-    if (!board_has_touch()) {
+    bool dash = cfg.uiMode == 1 || (cfg.uiMode == 0 && !board_has_touch());
+    if (dash) {
         dashMode = true;
         mr_get(&g);
         scr_dashboard(scr);
@@ -531,6 +540,8 @@ void ui_init() {
     build(S_HOME);
 
     lv_timer_create(tick_cb, 500, nullptr);
+    // Touch UI forced on a panel without touch: nobody can tap through it, so show each screen in turn.
+    if (!board_has_touch()) lv_timer_create(preview_cb, 8000, nullptr);
 }
 
 // ================================================================ HOME

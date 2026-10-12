@@ -18,7 +18,7 @@ void setup() {
 
     net_begin();
 
-    board_init(cfg.rotation);
+    board_init(cfg.uiMode == 2 ? (cfg.rotation & 2) : cfg.rotation);  // touch UI layout is landscape-only
     ui_icons_init();
     ui_boot_logo();
     mr_begin();

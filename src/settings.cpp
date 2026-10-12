@@ -22,6 +22,7 @@ void settings_load() {
     cfg.port = p.getUShort("port", 7125);
     cfg.sleepMin = p.getUShort("sleep", 0);
     cfg.rotation = p.getUChar("rot", 0) & 3;
+    cfg.uiMode = p.getUChar("ui", 0) % 3;
     p.end();
 }
 
@@ -38,5 +39,6 @@ void settings_save() {
     p.putUShort("port", cfg.port);
     p.putUShort("sleep", cfg.sleepMin);
     p.putUChar("rot", cfg.rotation);
+    p.putUChar("ui", cfg.uiMode);
     p.end();
 }
