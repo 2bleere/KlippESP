@@ -1,6 +1,6 @@
 # KlippESP – notes for working on this repo
 
-> **`wt32-idf5` branch:** the WT32 on Arduino core 3.3.12 / ESP-IDF 5.5.5 (pioarduino 55.03.312-1, LovyanGFX 1.2.28),
+> **Core:** the WT32 on Arduino core 3.3.12 / ESP-IDF 5.5.5 (pioarduino 55.03.312-1, LovyanGFX 1.2.28),
 > built with PlatformIO Core 6.2+ (`pio`) in its own `core_dir` (`~/.platformio-wt32`) so it doesn't
 > clobber the Waveshare's custom-built core libs. Free heap ~100–107 KB (min ~85–90 KB) after the RAM refactor:
 > LVGL pool 36 KB (worst screen: Home ~22.5 KB), Files and Macros are virtual lists (`ui_vlist`: only on-screen cells
