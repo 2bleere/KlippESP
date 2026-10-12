@@ -15,6 +15,30 @@ over Wi-Fi, so nothing needs to be installed on the printer. One code base, one 
 The touch UI scales to the panel: designed for 480×320, it grows 1.5× on the 800×480 Waveshare, with larger fonts so
 text stays sharp. Every screen works in landscape and portrait.
 
+## Screenshots
+
+Captured from the Waveshare (800×480) with `/screenshot.bmp`, against the mock printer in `tools/`. The WT32 shows the
+same touch UI at 480×320.
+
+**Status dashboard** (no-touch Waveshare): printing, idle, portrait
+
+<p>
+<img src="docs/screenshots/dashboard-printing.png" width="400" alt="Dashboard while printing">
+<img src="docs/screenshots/dashboard-idle.png" width="400" alt="Dashboard when idle">
+<img src="docs/screenshots/dashboard-portrait.png" width="240" alt="Dashboard in portrait">
+</p>
+
+**Touch UI**: Home, Printing, Files, Temperature, Move, Macros
+
+<p>
+<img src="docs/screenshots/touch-home.png" width="400" alt="Touch UI home">
+<img src="docs/screenshots/touch-printing.png" width="400" alt="Touch UI printing">
+<img src="docs/screenshots/touch-files.png" width="400" alt="Touch UI file list">
+<img src="docs/screenshots/touch-temperature.png" width="400" alt="Touch UI temperatures">
+<img src="docs/screenshots/touch-move.png" width="400" alt="Touch UI move">
+<img src="docs/screenshots/touch-macros.png" width="400" alt="Touch UI macros">
+</p>
+
 ## Touch UI
 
 | Screen | What it does |
