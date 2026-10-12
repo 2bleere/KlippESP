@@ -35,7 +35,7 @@ def main():
     if not xs:
         sys.exit("no artwork found")
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
-    side = max(x1 - x0, y1 - y0) + 24  # small margin
+    side = int(max(x1 - x0, y1 - y0) * 1.12)  # ~6 % margin per side, so rounded corners on the web page clip nothing
     cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
     box = (cx - side // 2, cy - side // 2, cx + side // 2, cy + side // 2)
     canvas = Image.new("RGB", (w + side, h + side), bg)
