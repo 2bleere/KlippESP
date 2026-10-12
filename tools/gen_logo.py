@@ -4,8 +4,8 @@
     python3 tools/gen_logo.py [source.png]
 
 Writes src/boot_logo.c (RGB565 LVGL image + background color) and src/web_logo.h (PNG for the web page).
-The glowing rounded square in the source is detected and cropped with a margin, so the logo works in
-landscape and portrait.
+The visible artwork (anything brighter than the background) is detected and cropped to a centered square with a
+small margin, so any logo on a plain dark background works in landscape and portrait.
 """
 import io
 import os
@@ -15,7 +15,7 @@ from PIL import Image
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "assets", "logo_source.png")
-BOOT_SIZE = 220   # px on the 480x320 panel
+BOOT_SIZE = 260   # px on the 480x320 panel
 WEB_SIZE = 160    # px PNG for the settings page
 
 
@@ -23,21 +23,21 @@ def main():
     im = Image.open(SRC).convert("RGB")
     w, h = im.size
     px = im.load()
-    # bounding box of the bright blue frame
+    bg = px[8, 8]  # background color from the corner
+    # bounding box of everything that stands out from the background (glow included)
     xs, ys = [], []
     for y in range(0, h, 2):
         for x in range(0, w, 2):
             r, g, b = px[x, y]
-            if b > 200 and r < 90 and g > 120:
+            if abs(r - bg[0]) + abs(g - bg[1]) + abs(b - bg[2]) > 60:
                 xs.append(x)
                 ys.append(y)
     if not xs:
-        sys.exit("logo frame not found")
+        sys.exit("no artwork found")
     x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
-    side = max(x1 - x0, y1 - y0) + 40  # margin keeps the glow
+    side = max(x1 - x0, y1 - y0) + 24  # small margin
     cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
     box = (cx - side // 2, cy - side // 2, cx + side // 2, cy + side // 2)
-    bg = px[8, 8]  # background color from the corner
     canvas = Image.new("RGB", (w + side, h + side), bg)
     canvas.paste(im, (side // 2, side // 2))
     crop = canvas.crop(tuple(v + side // 2 for v in box))
