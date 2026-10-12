@@ -207,6 +207,99 @@ void ui_ota_progress(int pct) {
     lv_refr_now(nullptr);  // the main loop is busy receiving firmware
 }
 
+// ---------------------------------------------------------------- virtual list
+
+#define VLIST_MAX_CELLS 40
+
+struct VList {
+    lv_obj_t* spacer;
+    lv_coord_t pitchX, pitchY, gap;
+    int cols, count, nCells;
+    vlist_bind_cb bind;
+    lv_obj_t* cells[VLIST_MAX_CELLS];
+};
+
+static void vlist_layout(lv_obj_t* cont, bool force) {
+    VList* v = (VList*)lv_obj_get_user_data(cont);
+    if (!v) return;
+    int firstRow = LV_MAX(0, lv_obj_get_scroll_y(cont)) / v->pitchY;
+    for (int k = 0; k < v->nCells; k++) {
+        lv_obj_t* c = v->cells[k];
+        int row = firstRow + k / v->cols, col = k % v->cols, idx = row * v->cols + col;
+        if (idx >= v->count) {
+            set_visible(c, false);
+            continue;
+        }
+        lv_obj_set_pos(c, col * v->pitchX, row * v->pitchY);
+        if (force || (int)(intptr_t)lv_obj_get_user_data(c) != idx) {
+            lv_obj_set_user_data(c, (void*)(intptr_t)idx);
+            v->bind(c, idx);
+        }
+        set_visible(c, true);
+    }
+}
+
+static void vlist_event(lv_event_t* e) {
+    lv_obj_t* cont = lv_event_get_target(e);
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_SCROLL || code == LV_EVENT_SCROLL_END) {
+        vlist_layout(cont, false);
+    } else if (code == LV_EVENT_DELETE) {
+        free(lv_obj_get_user_data(cont));
+        lv_obj_set_user_data(cont, nullptr);
+    }
+}
+
+lv_obj_t* ui_vlist(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h, lv_coord_t cellW,
+                   lv_coord_t cellH, lv_coord_t gap, int cols, vlist_make_cb make, vlist_bind_cb bind) {
+    const lv_coord_t pad = 6;
+    lv_obj_t* cont = lv_obj_create(parent);
+    lv_obj_set_pos(cont, x, y);
+    lv_obj_set_size(cont, w, h);
+    lv_obj_set_style_bg_opa(cont, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(cont, 0, 0);
+    lv_obj_set_style_radius(cont, 0, 0);
+    lv_obj_set_style_pad_all(cont, pad, 0);
+    lv_obj_set_scroll_dir(cont, LV_DIR_VER);
+    VList* v = (VList*)calloc(1, sizeof(VList));
+    if (!v) return cont;
+    v->gap = gap;
+    v->pitchX = cellW + gap;
+    v->pitchY = cellH + gap;
+    v->cols = LV_MAX(1, cols);
+    v->bind = bind;
+    // enough rows to cover the viewport while a row is partly scrolled out at each end
+    int rows = (h - 2 * pad) / v->pitchY + 2;
+    v->nCells = LV_MIN(rows * v->cols, VLIST_MAX_CELLS);
+    v->spacer = lv_obj_create(cont);  // sets the scrollable height for `count` items
+    lv_obj_remove_style_all(v->spacer);
+    lv_obj_set_size(v->spacer, 1, 1);
+    lv_obj_clear_flag(v->spacer, LV_OBJ_FLAG_CLICKABLE);
+    for (int k = 0; k < v->nCells; k++) {
+        v->cells[k] = make(cont);
+        lv_obj_set_user_data(v->cells[k], (void*)(intptr_t)-1);
+        lv_obj_add_flag(v->cells[k], LV_OBJ_FLAG_HIDDEN);
+    }
+    lv_obj_set_user_data(cont, v);
+    lv_obj_add_event_cb(cont, vlist_event, LV_EVENT_SCROLL, nullptr);
+    lv_obj_add_event_cb(cont, vlist_event, LV_EVENT_SCROLL_END, nullptr);
+    lv_obj_add_event_cb(cont, vlist_event, LV_EVENT_DELETE, nullptr);
+    return cont;
+}
+
+void ui_vlist_set_count(lv_obj_t* cont, int count) {
+    VList* v = (VList*)lv_obj_get_user_data(cont);
+    if (!v) return;
+    v->count = count;
+    int rows = (count + v->cols - 1) / v->cols;
+    lv_obj_set_pos(v->spacer, 0, LV_MAX(0, rows * v->pitchY - v->gap - 1));  // content ends at the last row
+    lv_obj_update_layout(cont);
+    if (lv_obj_get_scroll_bottom(cont) < 0) lv_obj_scroll_to_y(cont, LV_MAX(0, lv_obj_get_scroll_y(cont) + lv_obj_get_scroll_bottom(cont)), LV_ANIM_OFF);
+    vlist_layout(cont, true);
+}
+
+int ui_vlist_index(lv_obj_t* cell) { return (int)(intptr_t)lv_obj_get_user_data(cell); }
+
 // ---------------------------------------------------------------- toast
 
 static lv_obj_t* toast;
@@ -524,7 +617,12 @@ static void update_sleep() {
 
 // ---------------------------------------------------------------- main timer
 
+uint32_t ui_lvgl_peak;  // highest LVGL pool use seen (bytes), for sizing LV_MEM_SIZE
+
 static void tick_cb(lv_timer_t*) {
+    lv_mem_monitor_t mm;
+    lv_mem_monitor(&mm);
+    if (mm.total_size - mm.free_size > ui_lvgl_peak) ui_lvgl_peak = mm.total_size - mm.free_size;
     static uint32_t lastErr = 0;
     static char lastPstate[20] = "";
     static bool first = true;

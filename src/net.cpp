@@ -369,11 +369,21 @@ void net_begin() {
     server.on("/", HTTP_GET, handle_root);
     server.on("/save", HTTP_POST, handle_save);
     server.on("/scan", HTTP_GET, handle_scan);
-    server.on("/info", HTTP_GET, [] {  // build + memory facts for remote checks
-        char b[200];
-        snprintf(b, sizeof(b), "{\"idf\":\"%s\",\"built\":\"%s %s\",\"uptime_s\":%lu,\"heap\":%u,\"heap_min\":%u,\"largest\":%u}",
+    server.on("/info", HTTP_GET, [] {
+        extern uint32_t ui_lvgl_peak;  // build + memory facts for remote checks
+        lv_mem_monitor_t m;
+        lv_mem_monitor(&m);
+        uint32_t sp, sc;
+        mr_stack_free(&sp, &sc);
+        char b[360];
+        snprintf(b, sizeof(b),
+                 "{\"idf\":\"%s\",\"built\":\"%s %s\",\"uptime_s\":%lu,\"heap\":%u,\"heap_min\":%u,\"largest\":%u,"
+                 "\"lvgl_total\":%u,\"lvgl_peak\":%u,\"lvgl_now\":%u,\"lvgl_used_pct\":%u,\"lvgl_frag_pct\":%u,"
+                 "\"stack_free_poll\":%u,\"stack_free_cmd\":%u,\"stack_free_loop\":%u}",
                  ESP.getSdkVersion(), __DATE__, __TIME__, (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(),
-                 (unsigned)ESP.getMinFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT));
+                 (unsigned)ESP.getMinFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
+                 (unsigned)m.total_size, (unsigned)ui_lvgl_peak, (unsigned)(m.total_size - m.free_size), (unsigned)m.used_pct, (unsigned)m.frag_pct,
+                 (unsigned)sp, (unsigned)sc, (unsigned)uxTaskGetStackHighWaterMark(nullptr));
         server.send(200, "application/json", b);
     });
     server.on("/favicon.ico", HTTP_GET, [] { server.send_P(200, "image/png", (PGM_P)WEB_LOGO_PNG, WEB_LOGO_PNG_LEN); });

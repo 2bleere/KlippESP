@@ -70,8 +70,7 @@ struct MrState {
     MrFan fans[MR_MAX_FANS];
     int nFans;
 
-    char macros[MR_MAX_MACROS][40];
-    int nMacros;
+    int nMacros;        // names via mr_macro(): kept out of this struct, which is copied to the UI every tick
 
     MrPower power[MR_MAX_POWER];
     int nPower;
@@ -110,6 +109,9 @@ struct MrMeta {
 
 
 void mr_begin();
+void mr_stack_free(uint32_t* poll, uint32_t* cmd);  // diagnostics
+bool mr_macro(int i, char* out, size_t n);  // i-th macro name (sorted, no _hidden ones)
+bool mr_has_macro(const char* name);        // case-insensitive
 void mr_reconfigure();  // after host/port/apikey changed
 
 void mr_get(MrState* out);
@@ -123,7 +125,9 @@ void mr_power_toggle(const char* device);
 
 // data requests (asynchronous)
 void mr_request_files();
-uint32_t mr_files(std::vector<MrFile>& out);  // returns version
+// File list lives in the Moonraker module only; the UI reads the entries it shows (no per-tick list copies).
+uint32_t mr_files_version(int* count);  // changes whenever the list is replaced
+bool mr_file(int i, MrFile* out);       // newest first
 void mr_request_meta(const char* file);
 uint32_t mr_meta(MrMeta* out);
 

@@ -46,6 +46,15 @@ lv_obj_t* ui_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv
 lv_obj_t* ui_label(lv_obj_t* parent, const char* txt, const lv_font_t* font = nullptr, lv_color_t col = COL_TEXT);
 lv_obj_t* ui_row(lv_obj_t* parent, lv_coord_t w, lv_coord_t h);  // transparent flex row
 void ui_btn_text(lv_obj_t* btn, const char* txt);
+
+// Virtual list/grid: only the cells that fit on screen exist and are re-bound to items while scrolling, so LVGL
+// memory is the same for 3 or 300 items (a fully built 60-file list needed ~54 KB and overflowed the pool).
+typedef lv_obj_t* (*vlist_make_cb)(lv_obj_t* parent);  // create one cell (clickable)
+typedef void (*vlist_bind_cb)(lv_obj_t* cell, int index); // show item `index` in the cell
+lv_obj_t* ui_vlist(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h, lv_coord_t cellW,
+                   lv_coord_t cellH, lv_coord_t gap, int cols, vlist_make_cb make, vlist_bind_cb bind);
+void ui_vlist_set_count(lv_obj_t* list, int count);  // (re)bind after the item list changed
+int ui_vlist_index(lv_obj_t* cell);                  // item shown in a cell, for click handlers
 void ui_select(lv_obj_t* btn, bool on);  // highlight toggle-style buttons
 
 // Change-only setters: LVGL redraws an object whenever a property is set, even to the same value,

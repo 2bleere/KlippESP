@@ -15,7 +15,7 @@ static const char* basename_of(const char* p) {
 static lv_obj_t* fList;
 static lv_obj_t* fCount;
 static uint32_t fVer = 0;
-static std::vector<MrFile> fFiles;
+static int fCountN;  // entries in the Moonraker file list
 
 // detail dialog
 static lv_obj_t* dOverlay;
@@ -109,8 +109,9 @@ static void detail_update() {
 }
 
 static void file_click(lv_event_t* e) {
-    int i = (int)(intptr_t)lv_event_get_user_data(e);
-    if (i >= 0 && i < (int)fFiles.size()) open_detail(fFiles[i].path.c_str());
+    int i = ui_vlist_index(lv_event_get_current_target(e));
+    MrFile f;
+    if (mr_file(i, &f)) open_detail(f.path.c_str());
 }
 
 static void files_refresh(lv_event_t*) {
@@ -118,43 +119,47 @@ static void files_refresh(lv_event_t*) {
     set_text(fCount, "Loading...");
 }
 
+static lv_obj_t* file_cell(lv_obj_t* parent) {
+    lv_obj_t* b = lv_btn_create(parent);
+    lv_obj_set_size(b, CONTENT_W - 24, 46);
+    set_bg_color(b, COL_CARD, 0);
+    lv_obj_set_style_shadow_width(b, 0, 0);
+    lv_obj_set_style_radius(b, 8, 0);
+    lv_obj_set_style_pad_all(b, 3, 0);
+    lv_obj_add_event_cb(b, file_click, LV_EVENT_CLICKED, nullptr);
+    lv_obj_t* n = ui_label(b, "", &lv_font_montserrat_14);
+    lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
+    lv_obj_set_width(n, CONTENT_W - 40);
+    lv_obj_align(n, LV_ALIGN_TOP_LEFT, 4, 2);
+    lv_obj_t* d = ui_label(b, "", &lv_font_montserrat_12, COL_DIM);
+    lv_obj_align(d, LV_ALIGN_BOTTOM_LEFT, 4, 0);
+    return b;
+}
+
+static void file_bind(lv_obj_t* b, int i) {
+    MrFile f;
+    if (!mr_file(i, &f)) return;
+    set_text(lv_obj_get_child(b, 0), f.path.c_str());
+    time_t t = f.modified;
+    struct tm tmv;
+    localtime_r(&t, &tmv);  // TZ from settings (clock.cpp)
+    char d[32], buf[64];
+    strftime(d, sizeof(d), "%Y-%m-%d %H:%M", &tmv);
+    snprintf(buf, sizeof(buf), "%s   %.1f MB", d, f.size / 1048576.0f);
+    set_text(lv_obj_get_child(b, 1), buf);
+}
+
 static void files_rebuild() {
-    lv_obj_clean(fList);
-    char buf[64];
-    snprintf(buf, sizeof(buf), "%u files", (unsigned)fFiles.size());
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%d files", fCountN);
     set_text(fCount, buf);
-    for (size_t i = 0; i < fFiles.size(); i++) {
-        const MrFile& f = fFiles[i];
-        lv_obj_t* b = lv_btn_create(fList);
-        lv_obj_set_size(b, CONTENT_W - 24, 46);
-        set_bg_color(b, COL_CARD, 0);
-        lv_obj_set_style_shadow_width(b, 0, 0);
-        lv_obj_set_style_radius(b, 8, 0);
-        lv_obj_set_style_pad_all(b, 3, 0);
-        lv_obj_add_event_cb(b, file_click, LV_EVENT_CLICKED, (void*)(intptr_t)i);
-
-        lv_obj_t* n = ui_label(b, f.path.c_str(), &lv_font_montserrat_14);
-        lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
-        lv_obj_set_width(n, CONTENT_W - 40);
-        lv_obj_align(n, LV_ALIGN_TOP_LEFT, 4, 2);
-
-        time_t t = f.modified;
-        struct tm tmv;
-        localtime_r(&t, &tmv);  // TZ from settings (clock.cpp)
-        char d[32];
-        strftime(d, sizeof(d), "%Y-%m-%d %H:%M", &tmv);
-        snprintf(buf, sizeof(buf), "%s   %.1f MB", d, f.size / 1048576.0f);
-        lv_obj_t* s = ui_label(b, buf, &lv_font_montserrat_12, COL_DIM);
-        lv_obj_align(s, LV_ALIGN_BOTTOM_LEFT, 4, 0);
-    }
+    ui_vlist_set_count(fList, fCountN);
 }
 
 static void files_update() {
-    std::vector<MrFile> v;
-    uint32_t ver = mr_files(v);
+    uint32_t ver = mr_files_version(&fCountN);
     if (ver != fVer) {
         fVer = ver;
-        fFiles.swap(v);
         files_rebuild();
     }
     detail_update();
@@ -168,20 +173,10 @@ void scr_files(lv_obj_t* p) {
     lv_obj_t* rb = ui_btn(hdr, LV_SYMBOL_REFRESH " Refresh", 110, 34, files_refresh);
     lv_obj_set_style_text_font(rb, &lv_font_montserrat_14, 0);
 
-    fList = lv_obj_create(p);
-    lv_obj_set_pos(fList, 0, 40);
-    lv_obj_set_size(fList, CONTENT_W, CONTENT_H - 40);
-    lv_obj_set_style_bg_opa(fList, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(fList, 0, 0);
-    lv_obj_set_style_pad_all(fList, 6, 0);
-    lv_obj_set_style_pad_row(fList, 5, 0);
-    lv_obj_set_flex_flow(fList, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_scroll_dir(fList, LV_DIR_VER);
+    fList = ui_vlist(p, 0, 40, CONTENT_W, CONTENT_H - 40, CONTENT_W - 24, 46, 5, 1, file_cell, file_bind);
 
-    std::vector<MrFile> v;
-    fVer = mr_files(v);
-    fFiles.swap(v);
-    if (!fFiles.empty()) files_rebuild();
+    fVer = mr_files_version(&fCountN);
+    if (fCountN) files_rebuild();
     mr_request_files();
     ui_set_update(files_update);
 }

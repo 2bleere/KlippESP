@@ -1,4 +1,5 @@
 #include "moonraker.h"
+#include <memory>
 #include "settings.h"
 #include <WiFi.h>
 #include <HTTPClient.h>
@@ -171,12 +172,39 @@ static void loadMaxTemps(float& ext, float& bed) {
     bed = st["heater_bed"]["max_temp"] | 0.0f;
 }
 
+static char macroList[MR_MAX_MACROS][40];  // guarded by the state lock, like S
+
+bool mr_macro(int i, char* out, size_t n) {
+    Lock l;
+    if (i < 0 || i >= S.nMacros) return false;
+    strlcpy(out, macroList[i], n);
+    return true;
+}
+
+bool mr_has_macro(const char* name) {
+    Lock l;
+    for (int i = 0; i < S.nMacros; i++)
+        if (!strcasecmp(macroList[i], name)) return true;
+    return false;
+}
+
 static bool loadObjects() {
     JsonDocument d;
     if (httpGetJson("/printer/objects/list", d) != 200) return false;
 
-    MrState n;
-    memset(&n, 0, sizeof(n));
+    // discovery scratch lives on the heap: a full MrState here used to take ~5 KB of the poll task's stack
+    struct Found {
+        bool hasBed, hasProbe, hasQgl, hasZTilt, hasBedMesh;
+        MrTemp extra[MR_MAX_EXTRA], ext, bed;
+        int nExtra;
+        MrFan fans[MR_MAX_FANS];
+        int nFans;
+        char macros[MR_MAX_MACROS][40];
+        int nMacros;
+    };
+    std::unique_ptr<Found> np(new (std::nothrow) Found());
+    if (!np) return false;
+    Found& n = *np;
     String q = "/printer/objects/query?webhooks&print_stats&virtual_sdcard&display_status&toolhead&gcode_move&idle_timeout&extruder";
 
     for (JsonVariant v : d["result"]["objects"].as<JsonArray>()) {
@@ -238,7 +266,7 @@ static bool loadObjects() {
         S.hasQgl = n.hasQgl;
         S.hasZTilt = n.hasZTilt;
         S.hasBedMesh = n.hasBedMesh;
-        memcpy(S.macros, n.macros, sizeof(S.macros));
+        memcpy(macroList, n.macros, sizeof(macroList));
         S.nMacros = n.nMacros;
         memcpy(S.extra, n.extra, sizeof(S.extra));
         S.nExtra = n.nExtra;
@@ -680,6 +708,8 @@ static void urgentTask(void* arg) {
 
 // ---------------------------------------------------------------- public API
 
+static TaskHandle_t pollHandle, cmdHandle;
+
 void mr_begin() {
     mtx = xSemaphoreCreateMutex();
     dnsMtx = xSemaphoreCreateMutex();
@@ -688,8 +718,14 @@ void mr_begin() {
     strcpy(S.klippy, "offline");
     strcpy(S.pstate, "standby");
     S.speedFactor = S.extrudeFactor = 1;
-    xTaskCreatePinnedToCore(pollTask, "mr_poll", 12288, nullptr, 1, nullptr, 0);
-    xTaskCreatePinnedToCore(cmdTask, "mr_cmd", 12288, nullptr, 1, nullptr, 0);
+    // stacks sized from measured high-water marks (/info) plus ~3 KB margin; JSON documents live on the heap
+    xTaskCreatePinnedToCore(pollTask, "mr_poll", 7168, nullptr, 1, &pollHandle, 0);
+    xTaskCreatePinnedToCore(cmdTask, "mr_cmd", 6144, nullptr, 1, &cmdHandle, 0);
+}
+
+void mr_stack_free(uint32_t* poll, uint32_t* cmd) {  // lowest free stack so far, bytes
+    *poll = pollHandle ? uxTaskGetStackHighWaterMark(pollHandle) : 0;
+    *cmd = cmdHandle ? uxTaskGetStackHighWaterMark(cmdHandle) : 0;
 }
 
 void mr_reconfigure() { reconf = true; }
@@ -713,7 +749,7 @@ void mr_gcodef(const char* fmt, ...) {
 
 void mr_post(const char* path) {
     char* p = strdup(path);
-    if (xTaskCreatePinnedToCore(urgentTask, "mr_urgent", 8192, p, 2, nullptr, 0) != pdPASS) free(p);
+    if (xTaskCreatePinnedToCore(urgentTask, "mr_urgent", 6144, p, 2, nullptr, 0) != pdPASS) free(p);
 }
 
 void mr_print_file(const char* file) { enqueue(C_PRINT, file); }
@@ -721,10 +757,17 @@ void mr_power_toggle(const char* device) { enqueue(C_POWER, device); }
 void mr_request_files() { enqueue(C_FILES, ""); }
 void mr_request_meta(const char* file) { enqueue(C_META, file); }
 
-uint32_t mr_files(std::vector<MrFile>& out) {
+uint32_t mr_files_version(int* count) {
     Lock l;
-    out = files;
+    if (count) *count = (int)files.size();
     return filesVer;
+}
+
+bool mr_file(int i, MrFile* out) {
+    Lock l;
+    if (i < 0 || i >= (int)files.size()) return false;
+    *out = files[i];
+    return true;
 }
 
 uint32_t mr_meta(MrMeta* out) {

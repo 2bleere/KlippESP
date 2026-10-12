@@ -2,15 +2,19 @@
 
 > **`wt32-idf5` branch:** the WT32 on Arduino core 3.3.11 / ESP-IDF 5.5.5 (pioarduino 55.03.311, LovyanGFX 1.2.28),
 > built with PlatformIO Core 6.1.19 (`~/.pio61/bin/pio`) in its own `core_dir` (`~/.platformio-wt32`) so it doesn't
-> clobber the Waveshare's custom-built core libs. Free heap ~78–81 KB at runtime (min ~62 KB), ~35 KB less than on
-> core 2.0.14. PlatformIO OTA works (~52 s); the browser `/update` upload now gets ~640 KB in, then the board restarts.
-> `/info` returns IDF version, build time, uptime, free/min heap and largest block.
+> clobber the Waveshare's custom-built core libs. Free heap ~100–107 KB (min ~85–90 KB) after the RAM refactor:
+> LVGL pool 36 KB (worst screen: Home ~22.5 KB), Files and Macros are virtual lists (`ui_vlist`: only on-screen cells
+> exist, re-bound on scroll — a fully built 60-file list needed ~54 KB and crashed), task stacks sized from measured
+> high-water marks (poll 7 KB, cmd 6 KB, urgent 6 KB), macro names and the file list live only in the Moonraker
+> module (`mr_macro`, `mr_file`; no per-tick copies), object discovery scratch is on the heap. PlatformIO OTA works
+> (~52 s); the browser `/update` upload still drops the connection mid-way (no reboot). `/info` reports heap, LVGL
+> pool (now/peak/frag) and task stack headroom — check it after UI changes.
 >
 > **This is the `wt32-sc01` branch:** touch UI only, for the WT32-SC01 (classic ESP32, 4 MB flash, NO PSRAM,
 > ST7796 480×320 SPI + FT6336U, LovyanGFX). Envs: `wt32_sc01`, `wt32_sc01_ota`. Orientation is chosen at boot
 > (`cfg.rotation` 0..3); screen size is runtime: `SW`/`SH`/`PORTRAIT`, `CONTENT_W = SW`, `CONTENT_H = SH - TOPBAR_H`
 > (TOPBAR_H 40). Every builder has a landscape and a portrait branch (`const bool P = PORTRAIT`) — keep both working; fonts Montserrat 12/14/16/20/28 + icons_20/28. RAM is the constraint (~118 KB free at
-> runtime): LVGL has its own 48 KB pool (`lv_conf.h`), Moonraker JSON is parsed straight from the socket with
+> runtime): LVGL has its own pool (`lv_conf.h`, 36 KB on wt32-idf5), Moonraker JSON is parsed straight from the socket with
 > filters (`httpGetJson`), one 480×20 DMA draw buffer, file list capped at 60. No print thumbnails here: a PNG
 > decoder needs ~70 KB and froze the UI. Watch the serial `[stat]` line (heap, largest block, lvgl %, frag %). The Waveshare-specific notes below
 > (PSRAM, CH422G, RGB panel, dashboard) apply to `main`. Port Moonraker/net fixes between branches with cherry-pick.

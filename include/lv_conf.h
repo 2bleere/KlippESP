@@ -11,7 +11,7 @@
 /* LVGL's own memory pool, allocated once at lv_init(): keeps UI allocations from fragmenting the heap the
    network stack needs (no PSRAM on the WT32-SC01) */
 #define LV_MEM_CUSTOM 0
-#define LV_MEM_SIZE (48U * 1024U)
+#define LV_MEM_SIZE (36U * 1024U)  // worst screen ~22.5 KB (Home); long lists are virtual (ui_vlist)
 #define LV_MEM_ADR 0
 #define LV_MEM_POOL_INCLUDE <stdlib.h>
 #define LV_MEM_POOL_ALLOC malloc

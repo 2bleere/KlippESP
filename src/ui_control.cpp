@@ -294,11 +294,7 @@ static void extrude_cb(lv_event_t* e) {
 }
 static void eheat_cb(lv_event_t* e) { set_heater(g.ext, (int)(intptr_t)lv_event_get_user_data(e)); }
 
-static bool has_macro(const char* n) {
-    for (int i = 0; i < g.nMacros; i++)
-        if (!strcasecmp(g.macros[i], n)) return true;
-    return false;
-}
+static bool has_macro(const char* n) { return mr_has_macro(n); }
 
 static void extrude_update() {
     char buf[64];
@@ -469,33 +465,38 @@ static char macroPending[40];
 static void macro_yes(void*) { mr_gcode(macroPending); }
 
 static void macro_cb(lv_event_t* e) {
-    int i = (int)(intptr_t)lv_event_get_user_data(e);
+    int i = ui_vlist_index(lv_event_get_current_target(e));
     if (i >= g.nMacros) return;
-    strlcpy(macroPending, g.macros[i], sizeof(macroPending));
+    if (!mr_macro(i, macroPending, sizeof(macroPending))) return;
     char msg[80];
     snprintf(msg, sizeof(msg), "Run %s?", macroPending);
     ui_confirm("Macro", msg, macro_yes);
 }
 
+static lv_obj_t* macro_cell(lv_obj_t* parent) {
+    lv_obj_t* b = ui_btn(parent, "", PORTRAIT ? 150 : 152, 50, macro_cb, nullptr);
+    lv_obj_t* l = lv_obj_get_child(b, 0);
+    lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(l, 144);
+    lv_obj_set_style_text_font(l, &lv_font_montserrat_12, 0);
+    return b;
+}
+
+static void macro_bind(lv_obj_t* b, int i) {
+    char name[40];
+    if (mr_macro(i, name, sizeof(name))) set_text(lv_obj_get_child(b, 0), name);
+}
+
 void scr_macros(lv_obj_t* p) {
-    lv_obj_t* c = lv_obj_create(p);
-    lv_obj_set_pos(c, 0, 0);
-    lv_obj_set_size(c, CONTENT_W, CONTENT_H);
-    lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(c, 0, 0);
-    lv_obj_set_style_pad_all(c, 6, 0);
-    lv_obj_set_style_pad_row(c, 5, 0);
-    lv_obj_set_style_pad_column(c, 5, 0);
-    lv_obj_set_flex_flow(c, LV_FLEX_FLOW_ROW_WRAP);
-    lv_obj_set_scroll_dir(c, LV_DIR_VER);
-    if (!g.nMacros) ui_label(c, g.ready ? "No macros found" : "Printer not ready", &lv_font_montserrat_16, COL_DIM);
-    for (int i = 0; i < g.nMacros; i++) {
-        lv_obj_t* b = ui_btn(c, g.macros[i], PORTRAIT ? 150 : 152, 50, macro_cb, (void*)(intptr_t)i);
-        lv_obj_t* l = lv_obj_get_child(b, 0);
-        lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-        lv_obj_set_width(l, 144);
-        lv_obj_set_style_text_font(l, &lv_font_montserrat_12, 0);
+    if (!g.nMacros) {
+        lv_obj_t* l = ui_label(p, g.ready ? "No macros found" : "Printer not ready", &lv_font_montserrat_16, COL_DIM);
+        lv_obj_set_pos(l, 12, 12);
+        return;
     }
+    const lv_coord_t cw = PORTRAIT ? 150 : 152;
+    int cols = (CONTENT_W - 12 + 5) / (cw + 5);
+    lv_obj_t* list = ui_vlist(p, 0, 0, CONTENT_W, CONTENT_H, cw, 50, 5, cols, macro_cell, macro_bind);
+    ui_vlist_set_count(list, g.nMacros);
 }
 
 // ================================================================ POWER DEVICES
