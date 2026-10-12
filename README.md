@@ -2,7 +2,7 @@
 
 # KlippESP
 
-**v1.2.5** · A Klipper printer display for ESP32 touch screens. It talks to **Moonraker** (the API Mainsail uses)
+**v1.3.0** · A Klipper printer display for ESP32 touch screens. It talks to **Moonraker** (the API Mainsail uses)
 over Wi-Fi, so nothing needs to be installed on the printer. One code base, one build per display.
 
 ## Supported displays
