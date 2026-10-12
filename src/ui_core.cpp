@@ -8,12 +8,58 @@
 
 MrState g;
 bool PORTRAIT = false;
-lv_coord_t SW = 480, SH = 320;
+lv_coord_t SW = U(480), SH = U(320);
+
+int32_t UI_K256 = 256;
 
 static void ui_screen_size() {
     SW = lv_disp_get_hor_res(nullptr);
     SH = lv_disp_get_ver_res(nullptr);
     PORTRAIT = SH > SW;
+    lv_coord_t lng = LV_MAX(SW, SH), sht = LV_MIN(SW, SH);
+    UI_K256 = LV_MAX(256, LV_MIN(lng * 256 / 480, sht * 256 / 320));  // fit the 480x320 design
+}
+
+// largest compiled-in font that is no bigger than the scaled design size
+static const lv_font_t* pick_font(const lv_font_t* const* fonts, const int* sizes, int n, int px) {
+    int want = U(px), best = 0;
+    for (int i = 0; i < n; i++)
+        if (sizes[i] <= want) best = i;
+    return fonts[best];
+}
+
+const lv_font_t* FONT(int px) {
+    static const lv_font_t* const fonts[] = {&lv_font_montserrat_12, &lv_font_montserrat_14, &lv_font_montserrat_16,
+                                             &lv_font_montserrat_20,
+#if KLIPPESP_LARGE_FONTS
+                                             &lv_font_montserrat_24,
+#endif
+                                             &lv_font_montserrat_28,
+#if KLIPPESP_LARGE_FONTS
+                                             &lv_font_montserrat_32, &lv_font_montserrat_48
+#endif
+    };
+    static const int sizes[] = {12, 14, 16, 20,
+#if KLIPPESP_LARGE_FONTS
+                                24,
+#endif
+                                28,
+#if KLIPPESP_LARGE_FONTS
+                                32, 48
+#endif
+    };
+    return pick_font(fonts, sizes, sizeof(sizes) / sizeof(sizes[0]), px);
+}
+
+const lv_font_t* ICONS(int px) {
+#if KLIPPESP_LARGE_FONTS
+    static const lv_font_t* const fonts[] = {&icons_16, &icons_20, &icons_28, &icons_72};
+    static const int sizes[] = {16, 20, 28, 72};
+#else
+    static const lv_font_t* const fonts[] = {&icons_20, &icons_28};
+    static const int sizes[] = {20, 28};
+#endif
+    return pick_font(fonts, sizes, sizeof(sizes) / sizeof(sizes[0]), px);
 }
 
 void ui_icons_init() {
@@ -31,7 +77,7 @@ static lv_obj_t* btnBack;
 static lv_obj_t* btnHome;
 static lv_obj_t* lblWifi;
 static lv_obj_t* lblClock;
-#define TOPBAR_RIGHT_W (PORTRAIT ? 150 : 236)  // clock + wifi + STOP
+static lv_obj_t* topRight;  // clock + wifi + STOP, sized to its content
 
 static void (*upd)() = nullptr;
 static Scr cur = S_COUNT;
@@ -77,9 +123,9 @@ lv_obj_t* ui_btn(lv_obj_t* parent, const char* txt, lv_coord_t w, lv_coord_t h, 
     lv_obj_t* b = lv_btn_create(parent);
     lv_obj_set_size(b, w, h);
     lv_obj_set_style_bg_color(b, col, 0);
-    lv_obj_set_style_radius(b, 8, 0);
+    lv_obj_set_style_radius(b, U(8), 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
-    lv_obj_set_style_pad_all(b, 2, 0);
+    lv_obj_set_style_pad_all(b, U(2), 0);
     lv_obj_t* l = lv_label_create(b);
     lv_label_set_text(l, txt);
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
@@ -96,14 +142,14 @@ lv_obj_t* ui_tile(lv_obj_t* parent, const char* icon, const char* txt, lv_coord_
     lv_obj_t* b = lv_btn_create(parent);
     lv_obj_set_size(b, w, h);
     set_bg_color(b, col, 0);
-    lv_obj_set_style_radius(b, 10, 0);
+    lv_obj_set_style_radius(b, U(10), 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
-    lv_obj_set_style_pad_all(b, 2, 0);
+    lv_obj_set_style_pad_all(b, U(2), 0);
     lv_obj_set_flex_flow(b, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_flex_align(b, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_row(b, 4, 0);
-    ui_label(b, icon, &icons_28);
-    lv_obj_t* l = ui_label(b, txt, &lv_font_montserrat_14);
+    lv_obj_set_style_pad_row(b, U(4), 0);
+    ui_label(b, icon, ICONS(28));
+    lv_obj_t* l = ui_label(b, txt, FONT(14));
     lv_obj_set_style_text_align(l, LV_TEXT_ALIGN_CENTER, 0);
     if (cb) lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, ud);
     return b;
@@ -115,8 +161,8 @@ lv_obj_t* ui_card(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv
     lv_obj_set_size(c, w, h);
     lv_obj_set_style_bg_color(c, COL_CARD, 0);
     lv_obj_set_style_border_width(c, 0, 0);
-    lv_obj_set_style_radius(c, 10, 0);
-    lv_obj_set_style_pad_all(c, 8, 0);
+    lv_obj_set_style_radius(c, U(10), 0);
+    lv_obj_set_style_pad_all(c, U(8), 0);
     lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
     return c;
 }
@@ -127,7 +173,7 @@ lv_obj_t* ui_row(lv_obj_t* parent, lv_coord_t w, lv_coord_t h) {
     lv_obj_set_style_bg_opa(r, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(r, 0, 0);
     lv_obj_set_style_pad_all(r, 0, 0);
-    lv_obj_set_style_pad_column(r, 6, 0);
+    lv_obj_set_style_pad_column(r, U(6), 0);
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
@@ -189,17 +235,17 @@ void ui_ota_progress(int pct) {
         lv_obj_set_style_border_width(ov, 0, 0);
         lv_obj_set_style_radius(ov, 0, 0);
         lv_obj_clear_flag(ov, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", &lv_font_montserrat_20, COL_TEXT);
-        lv_obj_align(t, LV_ALIGN_CENTER, 0, -50);
-        lv_obj_t* s = ui_label(ov, "Do not unplug.\nThe display restarts when done.", &lv_font_montserrat_14, COL_DIM);
+        lv_obj_t* t = ui_label(ov, LV_SYMBOL_DOWNLOAD "  Updating firmware", FONT(20), COL_TEXT);
+        lv_obj_align(t, LV_ALIGN_CENTER, 0, -U(50));
+        lv_obj_t* s = ui_label(ov, "Do not unplug.\nThe display restarts when done.", FONT(14), COL_DIM);
         lv_obj_set_style_text_align(s, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(s, LV_ALIGN_CENTER, 0, -20);
+        lv_obj_align(s, LV_ALIGN_CENTER, 0, -U(20));
         bar = lv_bar_create(ov);
-        lv_obj_set_size(bar, SW - 80, 14);
-        lv_obj_align(bar, LV_ALIGN_CENTER, 0, 18);
+        lv_obj_set_size(bar, SW - U(80), U(14));
+        lv_obj_align(bar, LV_ALIGN_CENTER, 0, U(18));
         lv_bar_set_range(bar, 0, 100);
-        lbl = ui_label(ov, "", &lv_font_montserrat_20, COL_TEXT);
-        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, 52);
+        lbl = ui_label(ov, "", FONT(20), COL_TEXT);
+        lv_obj_align(lbl, LV_ALIGN_CENTER, 0, U(52));
     }
     if (pct >= 0 && pct < 100 && last >= 0 && pct - last < 2) return;
     if (pct == last) return;
@@ -256,7 +302,7 @@ static void vlist_event(lv_event_t* e) {
 
 lv_obj_t* ui_vlist(lv_obj_t* parent, lv_coord_t x, lv_coord_t y, lv_coord_t w, lv_coord_t h, lv_coord_t cellW,
                    lv_coord_t cellH, lv_coord_t gap, int cols, vlist_make_cb make, vlist_bind_cb bind) {
-    const lv_coord_t pad = 6;
+    const lv_coord_t pad = U(6);
     lv_obj_t* cont = lv_obj_create(parent);
     lv_obj_set_pos(cont, x, y);
     lv_obj_set_size(cont, w, h);
@@ -326,15 +372,15 @@ static void toast_click(lv_event_t*) {
 void ui_toast(const char* msg, bool error) {
     if (!toast) {
         toast = lv_label_create(lv_layer_top());
-        lv_obj_set_width(toast, SW - 40);
+        lv_obj_set_width(toast, SW - U(40));
         lv_label_set_long_mode(toast, LV_LABEL_LONG_WRAP);
-        lv_obj_set_style_text_font(toast, &lv_font_montserrat_14, 0);
-        lv_obj_set_style_pad_all(toast, 10, 0);
-        lv_obj_set_style_radius(toast, 10, 0);
+        lv_obj_set_style_text_font(toast, FONT(14), 0);
+        lv_obj_set_style_pad_all(toast, U(10), 0);
+        lv_obj_set_style_radius(toast, U(10), 0);
         lv_obj_set_style_bg_opa(toast, LV_OPA_90, 0);
         lv_obj_set_style_text_color(toast, COL_TEXT, 0);
         lv_obj_set_style_text_align(toast, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -10);
+        lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -U(10));
         lv_obj_add_flag(toast, LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(toast, toast_click, LV_EVENT_CLICKED, nullptr);
     }
@@ -367,13 +413,13 @@ static void confirm_evt(lv_event_t* e) {
 void ui_confirm(const char* title, const char* text, void (*cb)(void*), void* ud) {
     static const char* btns[] = {"Cancel", "OK", ""};
     lv_obj_t* mb = lv_msgbox_create(nullptr, title, text, btns, false);
-    lv_obj_set_width(mb, LV_MIN(380, SW - 20));
-    lv_obj_set_style_text_font(mb, &lv_font_montserrat_14, 0);
+    lv_obj_set_width(mb, LV_MIN(U(380), SW - U(20)));
+    lv_obj_set_style_text_font(mb, FONT(14), 0);
     lv_obj_center(mb);
     lv_obj_t* bm = lv_msgbox_get_btns(mb);
-    lv_obj_set_height(bm, 46);
+    lv_obj_set_height(bm, U(46));
     lv_btnmatrix_set_btn_ctrl_all(bm, LV_BTNMATRIX_CTRL_CLICK_TRIG);
-    lv_obj_set_style_min_width(bm, LV_MIN(300, SW - 60), 0);
+    lv_obj_set_style_min_width(bm, LV_MIN(U(300), SW - U(60)), 0);
     lv_obj_add_event_cb(mb, confirm_evt, LV_EVENT_VALUE_CHANGED, new ConfirmCtx{cb, ud});
 }
 
@@ -413,17 +459,17 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
     lv_obj_set_style_border_width(npOverlay, 0, 0);
     lv_obj_set_style_radius(npOverlay, 0, 0);
 
-    lv_obj_t* c = ui_card(npOverlay, 0, 0, PORTRAIT ? 300 : 440, PORTRAIT ? 420 : 300);
+    lv_obj_t* c = ui_card(npOverlay, 0, 0, PORTRAIT ? U(300) : U(440), PORTRAIT ? U(420) : U(300));
     lv_obj_center(c);
-    lv_obj_t* l = ui_label(c, title, &lv_font_montserrat_16);
+    lv_obj_t* l = ui_label(c, title, FONT(16));
     lv_obj_set_pos(l, 0, 0);
 
     npTa = lv_textarea_create(c);
     lv_textarea_set_one_line(npTa, true);
     lv_textarea_set_accepted_chars(npTa, "0123456789.-");
-    lv_obj_set_style_text_font(npTa, &lv_font_montserrat_28, 0);
-    lv_obj_set_size(npTa, PORTRAIT ? 284 : 150, 54);
-    lv_obj_set_pos(npTa, 0, 30);
+    lv_obj_set_style_text_font(npTa, FONT(28), 0);
+    lv_obj_set_size(npTa, PORTRAIT ? U(284) : U(150), U(54));
+    lv_obj_set_pos(npTa, 0, U(30));
     char buf[16];
     snprintf(buf, sizeof(buf), "%g", initial);
     lv_textarea_set_text(npTa, buf);
@@ -431,16 +477,16 @@ void ui_numpad(const char* title, float initial, void (*cb)(float)) {
     lv_obj_t* bm = lv_btnmatrix_create(c);
     lv_btnmatrix_set_map(bm, map);
     if (PORTRAIT) {
-        lv_obj_set_size(bm, 290, 314);
-        lv_obj_align(bm, LV_ALIGN_BOTTOM_MID, 0, 6);
+        lv_obj_set_size(bm, U(290), U(314));
+        lv_obj_align(bm, LV_ALIGN_BOTTOM_MID, 0, U(6));
     } else {
-        lv_obj_set_size(bm, 262, 284);
-        lv_obj_align(bm, LV_ALIGN_RIGHT_MID, 6, 0);
+        lv_obj_set_size(bm, U(262), U(284));
+        lv_obj_align(bm, LV_ALIGN_RIGHT_MID, U(6), 0);
     }
     lv_obj_set_style_bg_opa(bm, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(bm, 0, 0);
-    lv_obj_set_style_pad_all(bm, 2, 0);
-    lv_obj_set_style_text_font(bm, &lv_font_montserrat_20, LV_PART_ITEMS);
+    lv_obj_set_style_pad_all(bm, U(2), 0);
+    lv_obj_set_style_text_font(bm, FONT(20), LV_PART_ITEMS);
     lv_obj_add_event_cb(bm, np_evt, LV_EVENT_VALUE_CHANGED, nullptr);
 }
 
@@ -465,12 +511,13 @@ static void build(Scr s) {
         lv_obj_clear_flag(btnBack, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(btnHome, LV_OBJ_FLAG_HIDDEN);
     }
-    lv_obj_set_pos(lblTitle, s == S_HOME ? 8 : 98, badge ? 7 : 11);
+    lv_obj_set_pos(lblTitle, s == S_HOME ? U(8) : U(98), badge ? U(7) : U(11));
     // never run into the clock: titles that don't fit end in "..."
     lv_label_set_long_mode(lblTitle, LV_LABEL_LONG_DOT);
     lv_obj_set_width(lblTitle, LV_SIZE_CONTENT);
     lv_obj_update_layout(lblTitle);
-    lv_coord_t maxw = SW - TOPBAR_RIGHT_W - 8 - (s == S_HOME ? 8 : 98);
+    lv_obj_update_layout(topRight);
+    lv_coord_t maxw = SW - lv_obj_get_width(topRight) - U(12) - (s == S_HOME ? U(8) : U(98));
     if (lv_obj_get_width(lblTitle) > maxw) lv_obj_set_width(lblTitle, maxw);
     lv_obj_set_style_bg_opa(lblTitle, badge ? LV_OPA_COVER : LV_OPA_TRANSP, 0);
     if (badge) update_badge();
@@ -512,29 +559,35 @@ static void build_topbar(lv_obj_t* scr) {
     lv_obj_set_style_pad_all(bar, 0, 0);
     lv_obj_clear_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
 
-    btnBack = ui_btn(bar, LV_SYMBOL_LEFT, 42, 32, back_cb);
-    lv_obj_set_pos(btnBack, 4, 4);
-    btnHome = ui_btn(bar, LV_SYMBOL_HOME, 42, 32, home_cb);
-    lv_obj_set_pos(btnHome, 50, 4);
+    btnBack = ui_btn(bar, LV_SYMBOL_LEFT, U(42), U(32), back_cb);
+    lv_obj_set_pos(btnBack, U(4), U(4));
+    btnHome = ui_btn(bar, LV_SYMBOL_HOME, U(42), U(32), home_cb);
+    lv_obj_set_pos(btnHome, U(50), U(4));
 
-    lblTitle = ui_label(bar, "", &lv_font_montserrat_16);
-    lv_obj_set_pos(lblTitle, 98, 11);
-    lv_obj_set_style_radius(lblTitle, 8, 0);
-    lv_obj_set_style_pad_hor(lblTitle, 10, 0);
-    lv_obj_set_style_pad_ver(lblTitle, 4, 0);
+    lblTitle = ui_label(bar, "", FONT(16));
+    lv_obj_set_pos(lblTitle, U(98), U(11));
+    lv_obj_set_style_radius(lblTitle, U(8), 0);
+    lv_obj_set_style_pad_hor(lblTitle, U(10), 0);
+    lv_obj_set_style_pad_ver(lblTitle, U(4), 0);
 
     // date/time + wifi + E-STOP (temperatures live in the Home / Printing cards); tap the clock for Date & Time
-    lv_obj_t* r = ui_row(bar, TOPBAR_RIGHT_W, TOPBAR_H);
-    lv_obj_align(r, LV_ALIGN_RIGHT_MID, -4, 0);
+    lv_obj_t* r = topRight = ui_row(bar, U(200), TOPBAR_H);  // width set below from its contents
+    lv_obj_align(r, LV_ALIGN_RIGHT_MID, -U(4), 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_column(r, 6, 0);
+    lv_obj_set_style_pad_column(r, U(6), 0);
     lv_obj_add_flag(r, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(r, clock_cb, LV_EVENT_CLICKED, nullptr);
 
-    lblClock = ui_label(r, "", &lv_font_montserrat_16);
-    lblWifi = ui_label(r, LV_SYMBOL_WIFI, &lv_font_montserrat_14);
-    lv_obj_t* es = ui_btn(r, "STOP", 50, 32, estop_cb, nullptr, COL_RED);
-    lv_obj_set_style_text_font(es, &lv_font_montserrat_14, 0);
+    lblClock = ui_label(r, "", FONT(16));
+    // fixed width for the longest text, so the row (and the title space left of it) never changes size
+    const char* widest = PORTRAIT ? "12:59 PM" : "Wed 30 Sep  12:59 PM";
+    lv_obj_set_width(lblClock, lv_txt_get_width(widest, strlen(widest), FONT(16), 0, LV_TEXT_FLAG_NONE));
+    lv_obj_set_style_text_align(lblClock, LV_TEXT_ALIGN_RIGHT, 0);
+    lblWifi = ui_label(r, LV_SYMBOL_WIFI, FONT(14));
+    lv_obj_t* es = ui_btn(r, "STOP", U(50), U(32), estop_cb, nullptr, COL_RED);
+    lv_obj_set_style_text_font(es, FONT(14), 0);
+    lv_obj_update_layout(r);
+    lv_obj_set_width(r, lv_obj_get_width(lblClock) + lv_obj_get_width(lblWifi) + lv_obj_get_width(es) + 2 * U(6));
 }
 
 // Home shows a coloured state badge where other screens show their title.
@@ -706,7 +759,7 @@ void ui_init() {
     dashMode = ui_dashboard_mode();
     lv_disp_t* disp = lv_disp_get_default();
     lv_theme_t* th = lv_theme_default_init(disp, COL_ACCENT, COL_RED, true,
-                                           dashMode ? &lv_font_montserrat_20 : &lv_font_montserrat_16);
+                                           dashMode ? FONT(20) : FONT(16));
     lv_disp_set_theme(disp, th);
 
     lv_obj_t* scr = lv_scr_act();

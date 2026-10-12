@@ -16,10 +16,17 @@
 #define COL_TEXT    lv_color_hex(0xe6edf3)
 #define COL_DIM     lv_color_hex(0x8b949e)
 
-// Screen size is decided at boot by the orientation setting (480x320 landscape or 320x480 portrait).
+// Screen size is decided at boot by the board and the orientation setting.
 extern bool PORTRAIT;
 extern lv_coord_t SW, SH;  // screen width / height
-#define TOPBAR_H 40
+
+// The touch UI is designed for 480x320. Larger panels scale every fixed size (1.5x on 800x480) and pick
+// the nearest larger font, so layouts and text grow together. On a 480x320 panel U(x) == x.
+extern int32_t UI_K256;  // scale factor * 256 (integer math keeps every U() call small)
+#define U(x) ((lv_coord_t)(((int32_t)(x) * UI_K256 + 128) >> 8))
+const lv_font_t* FONT(int px);   // Montserrat for a design size (12, 14, 16, 20, 28)
+const lv_font_t* ICONS(int px);  // Material Design icons for a design size (20, 28)
+#define TOPBAR_H U(40)
 #define CONTENT_W SW
 #define CONTENT_H (SH - TOPBAR_H)
 

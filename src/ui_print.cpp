@@ -111,38 +111,38 @@ static void open_detail(const char* file) {
     lv_obj_set_style_border_width(dOverlay, 0, 0);
     lv_obj_set_style_radius(dOverlay, 0, 0);
 
-    const lv_coord_t cw = PORTRAIT ? 308 : 464, ch = PORTRAIT ? 380 : 300;
+    const lv_coord_t cw = PORTRAIT ? U(308) : U(464), ch = PORTRAIT ? U(380) : U(300);
     lv_obj_t* c = ui_card(dOverlay, 0, 0, cw, ch);
     lv_obj_center(c);
-    lv_obj_t* name = ui_label(c, basename_of(file), &lv_font_montserrat_16);
+    lv_obj_t* name = ui_label(c, basename_of(file), FONT(16));
     lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(name, cw - 18);
+    lv_obj_set_width(name, cw - U(18));
 
     lv_obj_t* box = lv_obj_create(c);
-    lv_obj_set_pos(box, 0, 26);
-    lv_obj_set_size(box, PORTRAIT ? 90 : 140, PORTRAIT ? 90 : 140);
+    lv_obj_set_pos(box, 0, U(26));
+    lv_obj_set_size(box, PORTRAIT ? U(90) : U(140), PORTRAIT ? U(90) : U(140));
     set_bg_color(box, COL_BG, 0);
     lv_obj_set_style_border_width(box, 0, 0);
     lv_obj_set_style_pad_all(box, 0, 0);
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_t* ph = ui_label(box, ICON_CUBE, &icons_28, COL_DIM);
+    lv_obj_t* ph = ui_label(box, ICON_CUBE, ICONS(28), COL_DIM);
     lv_obj_center(ph);
 #if KLIPPESP_THUMBNAILS
-    dImgBox = PORTRAIT ? 90 : 140;
+    dImgBox = PORTRAIT ? U(90) : U(140);
     dImg = lv_img_create(box);
     lv_obj_center(dImg);
 #endif
 
-    dInfo = ui_label(c, "Loading...", &lv_font_montserrat_14, COL_TEXT);
-    lv_obj_set_pos(dInfo, PORTRAIT ? 100 : 152, 30);
-    lv_obj_set_width(dInfo, cw - 18 - (PORTRAIT ? 100 : 152));
-    lv_obj_set_style_text_line_space(dInfo, 4, 0);
+    dInfo = ui_label(c, "Loading...", FONT(14), COL_TEXT);
+    lv_obj_set_pos(dInfo, PORTRAIT ? U(100) : U(152), U(30));
+    lv_obj_set_width(dInfo, cw - U(18) - (PORTRAIT ? U(100) : U(152)));
+    lv_obj_set_style_text_line_space(dInfo, U(4), 0);
 
-    lv_obj_t* r = ui_row(c, cw - 18, 50);
+    lv_obj_t* r = ui_row(c, cw - U(18), U(50));
     lv_obj_align(r, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_obj_set_flex_align(r, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    ui_btn(r, "Cancel", PORTRAIT ? 120 : 130, 46, detail_close);
-    lv_obj_t* pb = ui_btn(r, LV_SYMBOL_PLAY " Print", 150, 46, detail_print, nullptr, COL_GREEN);
+    ui_btn(r, "Cancel", PORTRAIT ? U(120) : U(130), U(46), detail_close);
+    lv_obj_t* pb = ui_btn(r, LV_SYMBOL_PLAY " Print", U(150), U(46), detail_print, nullptr, COL_GREEN);
     if (is_printing() || !g.ready) lv_obj_add_state(pb, LV_STATE_DISABLED);
 }
 
@@ -191,18 +191,18 @@ static void files_refresh(lv_event_t*) {
 
 static lv_obj_t* file_cell(lv_obj_t* parent) {
     lv_obj_t* b = lv_btn_create(parent);
-    lv_obj_set_size(b, CONTENT_W - 24, 46);
+    lv_obj_set_size(b, CONTENT_W - U(24), U(46));
     set_bg_color(b, COL_CARD, 0);
     lv_obj_set_style_shadow_width(b, 0, 0);
-    lv_obj_set_style_radius(b, 8, 0);
-    lv_obj_set_style_pad_all(b, 3, 0);
+    lv_obj_set_style_radius(b, U(8), 0);
+    lv_obj_set_style_pad_all(b, U(3), 0);
     lv_obj_add_event_cb(b, file_click, LV_EVENT_CLICKED, nullptr);
-    lv_obj_t* n = ui_label(b, "", &lv_font_montserrat_14);
+    lv_obj_t* n = ui_label(b, "", FONT(14));
     lv_label_set_long_mode(n, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(n, CONTENT_W - 40);
-    lv_obj_align(n, LV_ALIGN_TOP_LEFT, 4, 2);
-    lv_obj_t* d = ui_label(b, "", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_align(d, LV_ALIGN_BOTTOM_LEFT, 4, 0);
+    lv_obj_set_width(n, CONTENT_W - U(40));
+    lv_obj_align(n, LV_ALIGN_TOP_LEFT, U(4), U(2));
+    lv_obj_t* d = ui_label(b, "", FONT(12), COL_DIM);
+    lv_obj_align(d, LV_ALIGN_BOTTOM_LEFT, U(4), 0);
     return b;
 }
 
@@ -236,14 +236,14 @@ static void files_update() {
 }
 
 void scr_files(lv_obj_t* p) {
-    lv_obj_t* hdr = ui_row(p, CONTENT_W - 12, 38);
-    lv_obj_set_pos(hdr, 6, 2);
-    fCount = ui_label(hdr, "Loading...", &lv_font_montserrat_14, COL_DIM);
+    lv_obj_t* hdr = ui_row(p, CONTENT_W - U(12), U(38));
+    lv_obj_set_pos(hdr, U(6), U(2));
+    fCount = ui_label(hdr, "Loading...", FONT(14), COL_DIM);
     lv_obj_set_flex_grow(fCount, 1);
-    lv_obj_t* rb = ui_btn(hdr, LV_SYMBOL_REFRESH " Refresh", 110, 34, files_refresh);
-    lv_obj_set_style_text_font(rb, &lv_font_montserrat_14, 0);
+    lv_obj_t* rb = ui_btn(hdr, LV_SYMBOL_REFRESH " Refresh", U(110), U(34), files_refresh);
+    lv_obj_set_style_text_font(rb, FONT(14), 0);
 
-    fList = ui_vlist(p, 0, 40, CONTENT_W, CONTENT_H - 40, CONTENT_W - 24, 46, 5, 1, file_cell, file_bind);
+    fList = ui_vlist(p, 0, U(40), CONTENT_W, CONTENT_H - U(40), CONTENT_W - U(24), U(46), U(5), 1, file_cell, file_bind);
 
     fVer = mr_files_version(&fCountN);
     if (fCountN) files_rebuild();
@@ -298,35 +298,35 @@ static void zoffset_update() {
 
 void scr_zoffset(lv_obj_t* p) {
     const bool P = PORTRAIT;
-    const lv_coord_t w1 = P ? CONTENT_W - 12 : 226, h1 = P ? 150 : 268;
-    lv_obj_t* c = ui_card(p, 6, 6, w1, h1);
-    ui_label(c, "Current Z offset", &lv_font_montserrat_14, COL_DIM);
-    zVal = ui_label(c, "", &lv_font_montserrat_28);
-    lv_obj_set_pos(zVal, 0, 24);
+    const lv_coord_t w1 = P ? CONTENT_W - U(12) : U(226), h1 = P ? U(150) : U(268);
+    lv_obj_t* c = ui_card(p, U(6), U(6), w1, h1);
+    ui_label(c, "Current Z offset", FONT(14), COL_DIM);
+    zVal = ui_label(c, "", FONT(28));
+    lv_obj_set_pos(zVal, 0, U(24));
     lv_obj_t* hint = ui_label(c, P ? "Positive raises the nozzle; applied immediately."
                                    : "Positive values raise the\nnozzle. Applied immediately,\nalso during a print.",
-                              &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(hint, 0, P ? 62 : 70);
-    lv_obj_t* r = ui_row(c, w1 - 16, 46);
+                              FONT(12), COL_DIM);
+    lv_obj_set_pos(hint, 0, P ? U(62) : U(70));
+    lv_obj_t* r = ui_row(c, w1 - U(16), U(46));
     lv_obj_align(r, LV_ALIGN_BOTTOM_MID, 0, 0);
-    ui_btn(r, "Reset", (w1 - 22) / 2, 44, zreset_cb);
-    zSave = ui_btn(r, LV_SYMBOL_SAVE " Save", (w1 - 22) / 2, 44, zsave_cb, nullptr, COL_GREEN);
+    ui_btn(r, "Reset", (w1 - U(22)) / 2, U(44), zreset_cb);
+    zSave = ui_btn(r, LV_SYMBOL_SAVE " Save", (w1 - U(22)) / 2, U(44), zsave_cb, nullptr, COL_GREEN);
 
-    const lv_coord_t x2 = P ? 6 : 238, y2 = P ? 162 : 6, w2 = P ? CONTENT_W - 12 : 236, h2 = CONTENT_H - 6 - y2;
-    const lv_coord_t iw = w2 - 16;
+    const lv_coord_t x2 = P ? U(6) : U(238), y2 = P ? U(162) : U(6), w2 = P ? CONTENT_W - U(12) : U(236), h2 = CONTENT_H - U(6) - y2;
+    const lv_coord_t iw = w2 - U(16);
     lv_obj_t* s = ui_card(p, x2, y2, w2, h2);
-    ui_btn(s, LV_SYMBOL_UP "  Raise nozzle", iw, 74, zadj_cb, (void*)(intptr_t)1);
-    lv_obj_t* lower = ui_btn(s, LV_SYMBOL_DOWN "  Lower nozzle", iw, 74, zadj_cb, (void*)(intptr_t)-1);
-    lv_obj_set_pos(lower, 0, 80);
-    lv_obj_t* l = ui_label(s, "Step (mm)", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(l, 0, 162);
-    lv_obj_t* sr = ui_row(s, iw, h2 - 16 - 180);
+    ui_btn(s, LV_SYMBOL_UP "  Raise nozzle", iw, U(74), zadj_cb, (void*)(intptr_t)1);
+    lv_obj_t* lower = ui_btn(s, LV_SYMBOL_DOWN "  Lower nozzle", iw, U(74), zadj_cb, (void*)(intptr_t)-1);
+    lv_obj_set_pos(lower, 0, U(80));
+    lv_obj_t* l = ui_label(s, "Step (mm)", FONT(12), COL_DIM);
+    lv_obj_set_pos(l, 0, U(162));
+    lv_obj_t* sr = ui_row(s, iw, h2 - U(16) - U(180));
     lv_obj_align(sr, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_pad_column(sr, 3, 0);
+    lv_obj_set_style_pad_column(sr, U(3), 0);
     static const char* names[] = {"0.005", "0.01", "0.025", "0.05", "0.1"};
     for (int i = 0; i < 5; i++) {
-        zStepBtns[i] = ui_btn(sr, names[i], (iw - 12) / 5, h2 - 16 - 184, zstep_cb, (void*)(intptr_t)i);
-        lv_obj_set_style_text_font(zStepBtns[i], &lv_font_montserrat_12, 0);
+        zStepBtns[i] = ui_btn(sr, names[i], (iw - U(12)) / 5, h2 - U(16) - U(184), zstep_cb, (void*)(intptr_t)i);
+        lv_obj_set_style_text_font(zStepBtns[i], FONT(12), 0);
         ui_select(zStepBtns[i], i == zStep);
     }
     ui_set_update(zoffset_update);

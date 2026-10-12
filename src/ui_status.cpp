@@ -150,21 +150,21 @@ static void restart_cb(lv_event_t*) { mr_post("/printer/restart"); }
 static void fwrestart_cb(lv_event_t*) { mr_post("/printer/firmware_restart"); }
 
 static lv_obj_t* home_gauge(Gauge& gg, lv_obj_t* p, lv_coord_t y, lv_coord_t w, const char* icon, const char* name, int max) {
-    lv_obj_t* c = ui_card(p, 6, y, w, 84);
+    lv_obj_t* c = ui_card(p, U(6), y, w, U(84));
     gg.max = max;
-    gg.arc = make_arc(c, 66, 8, 135, 270);
+    gg.arc = make_arc(c, U(66), U(8), 135, 270);
     lv_obj_align(gg.arc, LV_ALIGN_LEFT_MID, 0, 0);
-    gg.icon = ui_label(gg.arc, icon, &icons_20, COL_DIM);
+    gg.icon = ui_label(gg.arc, icon, ICONS(20), COL_DIM);
     lv_obj_center(gg.icon);
-    lv_obj_t* n = ui_label(c, name, &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(n, 78, 0);
-    gg.temp = ui_label(c, "", &lv_font_montserrat_28);
-    lv_obj_set_pos(gg.temp, 76, 12);
-    gg.target = ui_label(c, "", &icons_20, COL_DIM);
-    lv_obj_align(gg.target, LV_ALIGN_TOP_RIGHT, 0, -2);
+    lv_obj_t* n = ui_label(c, name, FONT(12), COL_DIM);
+    lv_obj_set_pos(n, U(78), 0);
+    gg.temp = ui_label(c, "", FONT(28));
+    lv_obj_set_pos(gg.temp, U(76), U(12));
+    gg.target = ui_label(c, "", ICONS(20), COL_DIM);
+    lv_obj_align(gg.target, LV_ALIGN_TOP_RIGHT, 0, -U(2));
     gg.bar = lv_bar_create(c);
-    lv_obj_set_size(gg.bar, w - 16 - 78, 6);
-    lv_obj_set_pos(gg.bar, 78, 56);
+    lv_obj_set_size(gg.bar, w - U(16) - U(78), U(6));
+    lv_obj_set_pos(gg.bar, U(78), U(56));
     lv_bar_set_range(gg.bar, 0, 1000);
     return c;
 }
@@ -225,7 +225,7 @@ static void home_update() {
     char name[32], val[16];
     auto put = [&](const char* label, const char* v, lv_color_t col, bool fan) {
         if (i >= HOME_SLOTS) return;
-        fit_name(name, sizeof(name), &lv_font_montserrat_12, hSlotNameW, label, fan);
+        fit_name(name, sizeof(name), FONT(12), hSlotNameW, label, fan);
         set_text(hSlotName[i], name);
         set_text(hSlotVal[i], v);
         set_text_color(hSlotVal[i], col);
@@ -279,66 +279,66 @@ static void home_update() {
 
 void scr_home(lv_obj_t* p) {
     // landscape: status column left, 3x3 menu right; portrait: status on top, 3x3 menu below
-    const lv_coord_t pw = PORTRAIT ? CONTENT_W - 12 : 236;           // status panel width
-    const lv_coord_t ph = PORTRAIT ? 264 : CONTENT_H - 12;           // status panel height
-    hOnline[0] = home_gauge(hExt, p, 6, pw, ICON_NOZZLE, "Hotend", 300);
-    hOnline[1] = home_gauge(hBed, p, 96, pw, ICON_BED, "Bed", 120);
+    const lv_coord_t pw = PORTRAIT ? CONTENT_W - U(12) : U(236);           // status panel width
+    const lv_coord_t ph = PORTRAIT ? U(264) : CONTENT_H - U(12);           // status panel height
+    hOnline[0] = home_gauge(hExt, p, U(6), pw, ICON_NOZZLE, "Hotend", 300);
+    hOnline[1] = home_gauge(hBed, p, U(96), pw, ICON_BED, "Bed", 120);
 
-    lv_obj_t* lc = ui_card(p, 6, 186, pw, ph - 180);
+    lv_obj_t* lc = ui_card(p, U(6), U(186), pw, ph - U(180));
     hOnline[2] = lc;
-    lv_obj_set_style_pad_ver(lc, 5, 0);
-    lv_coord_t colW = (pw - 16) / 2;
-    hSlotNameW = colW - 46;
+    lv_obj_set_style_pad_ver(lc, U(5), 0);
+    lv_coord_t colW = (pw - U(16)) / 2;
+    hSlotNameW = colW - U(46);
     for (int k = 0; k < HOME_SLOTS; k++) {
-        lv_coord_t x = (k / 4) * colW, y = (k % 4) * (PORTRAIT ? 18 : 19);  // column by column
-        hSlotName[k] = ui_label(lc, "", &lv_font_montserrat_12, COL_DIM);
+        lv_coord_t x = (k / 4) * colW, y = (k % 4) * (PORTRAIT ? U(18) : U(19));  // column by column
+        hSlotName[k] = ui_label(lc, "", FONT(12), COL_DIM);
         lv_obj_set_pos(hSlotName[k], x, y);
-        hSlotVal[k] = ui_label(lc, "", &lv_font_montserrat_14);
-        lv_obj_set_width(hSlotVal[k], 40);
+        hSlotVal[k] = ui_label(lc, "", FONT(14));
+        lv_obj_set_width(hSlotVal[k], U(40));
         lv_obj_set_style_text_align(hSlotVal[k], LV_TEXT_ALIGN_RIGHT, 0);
-        lv_obj_set_pos(hSlotVal[k], x + colW - 46, y - 1);
+        lv_obj_set_pos(hSlotVal[k], x + colW - U(46), y - U(1));
     }
 
     // offline / Klipper-down status card (same area)
-    hOff = ui_card(p, 6, 6, pw, ph);
-    hOffIcon = ui_label(hOff, "", &lv_font_montserrat_28);
-    hOffTitle = ui_label(hOff, "", &lv_font_montserrat_20);
-    lv_obj_set_pos(hOffTitle, 40, 4);
-    hOffText = ui_label(hOff, "", &lv_font_montserrat_14, COL_TEXT);
+    hOff = ui_card(p, U(6), U(6), pw, ph);
+    hOffIcon = ui_label(hOff, "", FONT(28));
+    hOffTitle = ui_label(hOff, "", FONT(20));
+    lv_obj_set_pos(hOffTitle, U(40), U(4));
+    hOffText = ui_label(hOff, "", FONT(14), COL_TEXT);
     lv_label_set_long_mode(hOffText, LV_LABEL_LONG_DOT);
-    lv_obj_set_size(hOffText, pw - 16, ph - 16 - 44 - 74);
-    lv_obj_set_pos(hOffText, 0, 44);
-    hOffBtns = ui_row(hOff, pw - 16, 70);
+    lv_obj_set_size(hOffText, pw - U(16), ph - U(16) - U(44) - U(74));
+    lv_obj_set_pos(hOffText, 0, U(44));
+    hOffBtns = ui_row(hOff, pw - U(16), U(70));
     lv_obj_align(hOffBtns, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_t* rb = ui_btn(hOffBtns, LV_SYMBOL_REFRESH "\nRestart", (pw - 22) / 2, 66, restart_cb);
-    lv_obj_t* fb = ui_btn(hOffBtns, LV_SYMBOL_REFRESH "\nFW restart", (pw - 22) / 2, 66, fwrestart_cb, nullptr, COL_ORANGE);
-    lv_obj_set_style_text_font(rb, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_font(fb, &lv_font_montserrat_14, 0);
+    lv_obj_t* rb = ui_btn(hOffBtns, LV_SYMBOL_REFRESH "\nRestart", (pw - U(22)) / 2, U(66), restart_cb);
+    lv_obj_t* fb = ui_btn(hOffBtns, LV_SYMBOL_REFRESH "\nFW restart", (pw - U(22)) / 2, U(66), fwrestart_cb, nullptr, COL_ORANGE);
+    lv_obj_set_style_text_font(rb, FONT(14), 0);
+    lv_obj_set_style_text_font(fb, FONT(14), 0);
     lv_obj_add_flag(hOff, LV_OBJ_FLAG_HIDDEN);
 
     // menu
     lv_obj_t* grid = lv_obj_create(p);
-    lv_coord_t gx = PORTRAIT ? 6 : 248, gy = PORTRAIT ? 276 : 6;
-    lv_coord_t gw = PORTRAIT ? CONTENT_W - 12 : 226, gh = CONTENT_H - gy - 6;
+    lv_coord_t gx = PORTRAIT ? U(6) : U(248), gy = PORTRAIT ? U(276) : U(6);
+    lv_coord_t gw = CONTENT_W - gx - U(6), gh = CONTENT_H - gy - U(6);  // the menu takes the remaining space
     lv_obj_set_pos(grid, gx, gy);
     lv_obj_set_size(grid, gw, gh);
     lv_obj_set_style_bg_opa(grid, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(grid, 0, 0);
     lv_obj_set_style_pad_all(grid, 0, 0);
-    lv_obj_set_style_pad_row(grid, 5, 0);
-    lv_obj_set_style_pad_column(grid, 5, 0);
+    lv_obj_set_style_pad_row(grid, U(5), 0);
+    lv_obj_set_style_pad_column(grid, U(5), 0);
     lv_obj_set_flex_flow(grid, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_clear_flag(grid, LV_OBJ_FLAG_SCROLLABLE);
 
     static const char* icons[9] = {ICON_PRINTER, ICON_THERMO, ICON_POS, ICON_NOZZLE, ICON_FAN,
                                    LV_SYMBOL_LIST, LV_SYMBOL_KEYBOARD, LV_SYMBOL_POWER, LV_SYMBOL_SETTINGS};
     static const char* names[9] = {"Print", "Temp", "Move", "Extrude", "Fans", "Macros", "Console", "Power", "Settings"};
-    lv_coord_t tw = (gw - 10) / 3, th = (gh - 10) / 3;
+    lv_coord_t tw = (gw - 2 * U(5)) / 3, th = (gh - 2 * U(5)) / 3;  // from the scaled gaps, so 3 always fit
     for (int k = 0; k < 9; k++) {
         Scr s = HOME_TILE_SCR[k];
         lv_obj_t* b = ui_tile(grid, icons[k], names[k], tw, th, nullptr, nullptr, s == S_FILES ? COL_ACCENT : COL_BTN);
-        lv_obj_set_style_text_font(lv_obj_get_child(b, 1), &lv_font_montserrat_12, 0);
-        if (PORTRAIT) lv_obj_set_style_pad_row(b, 1, 0);
+        lv_obj_set_style_text_font(lv_obj_get_child(b, 1), FONT(12), 0);
+        if (PORTRAIT) lv_obj_set_style_pad_row(b, U(1), 0);
         lv_obj_add_event_cb(b, [](lv_event_t* e) {
             Scr s = (Scr)(intptr_t)lv_event_get_user_data(e);
             if (s == S_POWER) ui_power_open();
@@ -374,33 +374,33 @@ static void cancel_cb(lv_event_t*) {
 
 static void mini_gauge(Gauge& gg, lv_obj_t* c, lv_coord_t x, const char* icon, int max) {
     gg.max = max;
-    gg.arc = make_arc(c, 52, 6, 135, 270);
+    gg.arc = make_arc(c, U(52), U(6), 135, 270);
     lv_obj_set_pos(gg.arc, x, 0);
-    gg.icon = ui_label(gg.arc, icon, &icons_20, COL_DIM);
+    gg.icon = ui_label(gg.arc, icon, ICONS(20), COL_DIM);
     lv_obj_center(gg.icon);
-    gg.temp = ui_label(c, "", &lv_font_montserrat_20);
-    lv_obj_set_pos(gg.temp, x + 56, -2);
-    gg.target = ui_label(c, "", &icons_20, COL_DIM);
-    lv_obj_set_pos(gg.target, x + 56, 20);
+    gg.temp = ui_label(c, "", FONT(20));
+    lv_obj_set_pos(gg.temp, x + U(56), -U(2));
+    gg.target = ui_label(c, "", ICONS(20), COL_DIM);
+    lv_obj_set_pos(gg.target, x + U(56), U(20));
     gg.bar = lv_bar_create(c);
-    lv_obj_set_size(gg.bar, 84, 5);
-    lv_obj_set_pos(gg.bar, x + 56, 48);
+    lv_obj_set_size(gg.bar, U(84), U(5));
+    lv_obj_set_pos(gg.bar, x + U(56), U(48));
     lv_bar_set_range(gg.bar, 0, 1000);
 }
 
 static void make_tile(Tile& t, lv_obj_t* p, lv_coord_t x, lv_coord_t y, lv_coord_t w, const char* icon, const char* cap) {
     lv_obj_t* c = lv_obj_create(p);
     lv_obj_set_pos(c, x, y);
-    lv_obj_set_size(c, w, 52);
+    lv_obj_set_size(c, w, U(52));
     set_bg_color(c, COL_TILE, 0);
     lv_obj_set_style_border_width(c, 0, 0);
-    lv_obj_set_style_radius(c, 8, 0);
-    lv_obj_set_style_pad_all(c, 4, 0);
+    lv_obj_set_style_radius(c, U(8), 0);
+    lv_obj_set_style_pad_all(c, U(4), 0);
     lv_obj_clear_flag(c, LV_OBJ_FLAG_SCROLLABLE);
-    t.icon = ui_label(c, icon, &icons_20, COL_ACCENT);
-    lv_obj_t* cl = ui_label(c, cap, &lv_font_montserrat_12, COL_DIM);
-    lv_obj_align(cl, LV_ALIGN_TOP_RIGHT, 0, 2);
-    t.value = ui_label(c, "", &lv_font_montserrat_14);
+    t.icon = ui_label(c, icon, ICONS(20), COL_ACCENT);
+    lv_obj_t* cl = ui_label(c, cap, FONT(12), COL_DIM);
+    lv_obj_align(cl, LV_ALIGN_TOP_RIGHT, 0, U(2));
+    t.value = ui_label(c, "", FONT(14));
     lv_obj_align(t.value, LV_ALIGN_BOTTOM_LEFT, 0, 0);
 }
 
@@ -474,11 +474,11 @@ static void printing_update() {
 void scr_printing(lv_obj_t* p) {
     // landscape: ring column left, gauges/tiles/actions right; portrait: ring card on top, everything stacked
     const bool P = PORTRAIT;
-    lv_obj_t* l = P ? ui_card(p, 6, 6, CONTENT_W - 12, 170) : ui_card(p, 6, 6, 160, 268);
-    pRing = make_arc(l, P ? 152 : 144, 10, 270, 360);
+    lv_obj_t* l = P ? ui_card(p, U(6), U(6), CONTENT_W - U(12), U(170)) : ui_card(p, U(6), U(6), U(160), U(268));
+    pRing = make_arc(l, P ? U(152) : U(144), U(10), 270, 360);
     lv_obj_align(pRing, P ? LV_ALIGN_LEFT_MID : LV_ALIGN_TOP_MID, 0, 0);
     lv_obj_t* box = lv_obj_create(pRing);
-    lv_obj_set_size(box, 108, 108);
+    lv_obj_set_size(box, U(108), U(108));
     set_bg_color(box, COL_BG, 0);
     lv_obj_set_style_bg_opa(box, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(box, 0, 0);
@@ -487,58 +487,63 @@ void scr_printing(lv_obj_t* p) {
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_center(box);
     // native 56 px glyph: LVGL transforms (zoom) need an off-screen layer that the small pool can't provide
+#if KLIPPESP_LARGE_FONTS
+    pIcon = ui_label(box, ICON_NOZZLE, UI_K256 > 256 ? &icons_72 : &icons_56, COL_DIM);  // large panels: 72 px glyph
+#else
     pIcon = ui_label(box, ICON_NOZZLE, &icons_56, COL_DIM);
+#endif
     lv_obj_center(pIcon);
 
-    const lv_coord_t tw = P ? CONTENT_W - 12 - 16 - 162 : 144;  // text column width
-    pPct = ui_label(l, "", &lv_font_montserrat_28);
-    pChip = ui_label(l, "", &lv_font_montserrat_14);
+    const lv_coord_t tw = P ? CONTENT_W - U(12) - U(16) - U(162) : U(144);  // text column width
+    pPct = ui_label(l, "", FONT(28));
+    pChip = ui_label(l, "", FONT(14));
     lv_label_set_long_mode(pChip, LV_LABEL_LONG_DOT);
     lv_obj_set_width(pChip, tw);
-    pName = ui_label(l, "", &lv_font_montserrat_12, COL_DIM);
+    pName = ui_label(l, "", FONT(12), COL_DIM);
     lv_label_set_long_mode(pName, LV_LABEL_LONG_DOT);
-    lv_obj_set_size(pName, tw, P ? 46 : 30);
-    pEta = ui_label(l, "", &lv_font_montserrat_14, COL_ACCENT);
+    lv_obj_set_size(pName, tw, P ? U(46) : U(30));
+    pEta = ui_label(l, "", FONT(14), COL_ACCENT);
     if (P) {
-        lv_obj_set_pos(pPct, 162, 12);
-        lv_obj_set_pos(pChip, 162, 54);
-        lv_obj_set_pos(pName, 162, 82);
-        lv_obj_set_pos(pEta, 162, 132);
+        lv_obj_set_pos(pPct, U(162), U(12));
+        lv_obj_set_pos(pChip, U(162), U(54));
+        lv_obj_set_pos(pName, U(162), U(82));
+        lv_obj_set_pos(pEta, U(162), U(132));
     } else {
-        lv_obj_align(pEta, LV_ALIGN_TOP_MID, 0, 236);
+        lv_obj_align(pEta, LV_ALIGN_TOP_MID, 0, U(236));
         lv_obj_set_style_text_align(pChip, LV_TEXT_ALIGN_CENTER, 0);
         lv_obj_set_style_text_align(pName, LV_TEXT_ALIGN_CENTER, 0);
-        lv_obj_align(pPct, LV_ALIGN_TOP_MID, 0, 146);
-        lv_obj_align(pChip, LV_ALIGN_TOP_MID, 0, 180);
-        lv_obj_align(pName, LV_ALIGN_TOP_MID, 0, 204);
+        lv_obj_align(pPct, LV_ALIGN_TOP_MID, 0, U(146));
+        lv_obj_align(pChip, LV_ALIGN_TOP_MID, 0, U(180));
+        lv_obj_align(pName, LV_ALIGN_TOP_MID, 0, U(204));
     }
 
     // hotend + bed gauges
-    const lv_coord_t rx = P ? 6 : 172, rw = P ? CONTENT_W - 12 : 302;
-    lv_coord_t y = P ? 182 : 6;
-    lv_obj_t* gc = ui_card(p, rx, y, rw, 70);
+    const lv_coord_t rx = P ? U(6) : U(172), rw = CONTENT_W - rx - U(6);  // right column takes the remaining width
+    lv_coord_t y = P ? U(182) : U(6);
+    lv_obj_t* gc = ui_card(p, rx, y, rw, U(70));
     mini_gauge(pExt, gc, 0, ICON_NOZZLE, 300);
-    mini_gauge(pBed, gc, (rw - 16) / 2, ICON_BED, 120);
-    y += 76;
+    mini_gauge(pBed, gc, (rw - U(16)) / 2, ICON_BED, 120);
+    y += U(76);
 
     // tiles
     static const char* icons[8] = {ICON_CLOCK, ICON_HOURGLASS, ICON_LAYERS, ICON_Z, ICON_SPEED, ICON_FLOW, ICON_FAN, ICON_FILAMENT};
     static const char* caps[8] = {"Time", "Left", "Layer", "Z", "Speed", "Flow", "Fan", "Fil."};
-    const lv_coord_t tileW = (rw - 12) / 4;
-    for (int i = 0; i < 8; i++) make_tile(pTiles[i], p, rx + (i % 4) * (tileW + 4), y + (i / 4) * 56, tileW, icons[i], caps[i]);
-    y += 114;
+    const lv_coord_t tileW = (rw - 3 * U(4)) / 4;
+    for (int i = 0; i < 8; i++)
+        make_tile(pTiles[i], p, rx + (i % 4) * (tileW + U(4)), y + (i / 4) * U(56), tileW, icons[i], caps[i]);
+    y += U(114);
 
     // actions
-    const lv_coord_t bh = CONTENT_H - 6 - y;
+    const lv_coord_t bh = CONTENT_H - U(6) - y;
     lv_obj_t* row = ui_row(p, rw, bh);
     lv_obj_set_pos(row, rx, y);
-    lv_obj_set_style_pad_column(row, 4, 0);
+    lv_obj_set_style_pad_column(row, U(4), 0);
     pBtnPause = ui_btn(row, "", tileW, bh, pause_cb);
     pBtnCancel = ui_btn(row, "", tileW, bh, cancel_cb, nullptr, COL_RED);
     lv_obj_t* tune = ui_btn(row, LV_SYMBOL_LOOP "\nTune", tileW, bh, goto_cb, (void*)(intptr_t)S_FANS);
     lv_obj_t* zo = ui_btn(row, LV_SYMBOL_UP LV_SYMBOL_DOWN "\nZ offset", tileW, bh, goto_cb, (void*)(intptr_t)S_ZOFFSET);
     lv_obj_t* btns[] = {pBtnPause, pBtnCancel, tune, zo};
-    for (lv_obj_t* b : btns) lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
+    for (lv_obj_t* b : btns) lv_obj_set_style_text_font(b, FONT(14), 0);
 
     ui_set_update(printing_update);
 }

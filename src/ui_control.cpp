@@ -8,7 +8,7 @@ static lv_obj_t* make_scroll_col(lv_obj_t* p, lv_coord_t x, lv_coord_t y, lv_coo
     lv_obj_set_style_bg_opa(c, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(c, 0, 0);
     lv_obj_set_style_pad_all(c, 0, 0);
-    lv_obj_set_style_pad_row(c, 5, 0);
+    lv_obj_set_style_pad_row(c, U(5), 0);
     lv_obj_set_flex_flow(c, LV_FLEX_FLOW_COLUMN);
     lv_obj_set_scroll_dir(c, LV_DIR_VER);
     return c;
@@ -112,10 +112,10 @@ static void temp_update() {
 
 void scr_temp(lv_obj_t* p) {
     const bool P = PORTRAIT;  // portrait: heater buttons in a 2-column strip on top, controls below
-    lv_obj_t* list = make_scroll_col(p, 6, 6, P ? CONTENT_W - 12 : 160, P ? 106 : 268);
+    lv_obj_t* list = make_scroll_col(p, U(6), U(6), P ? CONTENT_W - U(12) : U(160), P ? U(106) : U(268));
     if (P) {
         lv_obj_set_flex_flow(list, LV_FLEX_FLOW_ROW_WRAP);
-        lv_obj_set_style_pad_column(list, 4, 0);
+        lv_obj_set_style_pad_column(list, U(4), 0);
     }
     tCount = 0;
     tMap[tCount++] = -1;
@@ -124,52 +124,52 @@ void scr_temp(lv_obj_t* p) {
         if (g.extra[i].settable) tMap[tCount++] = i;
     if (tSel >= tCount) tSel = 0;
     for (int i = 0; i < tCount; i++) {
-        tBtns[i] = ui_btn(list, "", P ? (CONTENT_W - 16) / 2 : 156, 48, temp_sel_cb, (void*)(intptr_t)i);
-        lv_obj_set_style_text_font(tBtns[i], &lv_font_montserrat_14, 0);
+        tBtns[i] = ui_btn(list, "", P ? (CONTENT_W - U(16)) / 2 : U(156), U(48), temp_sel_cb, (void*)(intptr_t)i);
+        lv_obj_set_style_text_font(tBtns[i], FONT(14), 0);
         lv_obj_set_style_text_align(lv_obj_get_child(tBtns[i], 0), LV_TEXT_ALIGN_LEFT, 0);
-        lv_obj_align(lv_obj_get_child(tBtns[i], 0), LV_ALIGN_LEFT_MID, 6, 0);
+        lv_obj_align(lv_obj_get_child(tBtns[i], 0), LV_ALIGN_LEFT_MID, U(6), 0);
         ui_select(tBtns[i], i == tSel);
     }
-    tSensors = ui_label(list, "", &lv_font_montserrat_12, COL_DIM);
+    tSensors = ui_label(list, "", FONT(12), COL_DIM);
 
-    lv_obj_t* c = P ? ui_card(p, 6, 118, CONTENT_W - 12, CONTENT_H - 124) : ui_card(p, 172, 6, 302, 268);
-    tName = ui_label(c, "", &lv_font_montserrat_14, COL_DIM);
-    tTarget = ui_btn(c, "", 120, 50, temp_num_cb, nullptr, COL_BG);
-    lv_obj_set_style_text_font(tTarget, &lv_font_montserrat_28, 0);
-    lv_obj_set_pos(tTarget, 0, 20);
-    tCur = ui_label(c, "", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(tCur, 130, 24);
-    lv_obj_t* hint = ui_label(c, "tap the target to type", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(hint, 130, 46);
+    lv_obj_t* c = P ? ui_card(p, U(6), U(118), CONTENT_W - U(12), CONTENT_H - U(124)) : ui_card(p, U(172), U(6), U(302), U(268));
+    tName = ui_label(c, "", FONT(14), COL_DIM);
+    tTarget = ui_btn(c, "", U(120), U(50), temp_num_cb, nullptr, COL_BG);
+    lv_obj_set_style_text_font(tTarget, FONT(28), 0);
+    lv_obj_set_pos(tTarget, 0, U(20));
+    tCur = ui_label(c, "", FONT(12), COL_DIM);
+    lv_obj_set_pos(tCur, U(130), U(24));
+    lv_obj_t* hint = ui_label(c, "tap the target to type", FONT(12), COL_DIM);
+    lv_obj_set_pos(hint, U(130), U(46));
 
-    lv_obj_t* r = ui_row(c, 286, 46);
-    lv_obj_set_pos(r, 0, 78);
-    lv_obj_set_style_pad_column(r, 4, 0);
+    lv_obj_t* r = ui_row(c, U(286), U(46));
+    lv_obj_set_pos(r, 0, U(78));
+    lv_obj_set_style_pad_column(r, U(4), 0);
     static const int deltas[] = {-10, -5, -1, 1, 5, 10};
     for (int d : deltas) {
         char t[8];
         snprintf(t, sizeof(t), "%+d", d);
-        lv_obj_t* b = ui_btn(r, t, 44, 44, temp_delta_cb, (void*)(intptr_t)d);
-        lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
+        lv_obj_t* b = ui_btn(r, t, U(44), U(44), temp_delta_cb, (void*)(intptr_t)d);
+        lv_obj_set_style_text_font(b, FONT(14), 0);
     }
 
-    lv_obj_t* off = ui_btn(c, "Off", 80, 36, temp_off_cb, nullptr, COL_RED);
-    lv_obj_set_style_text_font(off, &lv_font_montserrat_14, 0);
-    lv_obj_set_pos(off, 0, 130);
+    lv_obj_t* off = ui_btn(c, "Off", U(80), U(36), temp_off_cb, nullptr, COL_RED);
+    lv_obj_set_style_text_font(off, FONT(14), 0);
+    lv_obj_set_pos(off, 0, U(130));
 
-    lv_obj_t* pl = ui_label(c, "Preheat (hotend / bed)", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(pl, 0, 174);
-    lv_obj_t* r3 = ui_row(c, 286, 56);
+    lv_obj_t* pl = ui_label(c, "Preheat (hotend / bed)", FONT(12), COL_DIM);
+    lv_obj_set_pos(pl, 0, U(174));
+    lv_obj_t* r3 = ui_row(c, U(286), U(56));
     lv_obj_align(r3, LV_ALIGN_BOTTOM_MID, 0, 0);
-    lv_obj_set_style_pad_column(r3, 4, 0);
+    lv_obj_set_style_pad_column(r3, U(4), 0);
     for (int i = 0; i < 4; i++) {
         char t[32];
         snprintf(t, sizeof(t), "%s\n%d/%d", presets[i].name, presets[i].ext, presets[i].bed);
-        lv_obj_t* b = ui_btn(r3, t, 54, 54, preset_cb, (void*)(intptr_t)i, COL_ORANGE);
-        lv_obj_set_style_text_font(b, &lv_font_montserrat_12, 0);
+        lv_obj_t* b = ui_btn(r3, t, U(54), U(54), preset_cb, (void*)(intptr_t)i, COL_ORANGE);
+        lv_obj_set_style_text_font(b, FONT(12), 0);
     }
-    lv_obj_t* cd = ui_btn(r3, "Cool\ndown", 54, 54, preset_cb, (void*)(intptr_t)-1, COL_ACCENT);
-    lv_obj_set_style_text_font(cd, &lv_font_montserrat_12, 0);
+    lv_obj_t* cd = ui_btn(r3, "Cool\ndown", U(54), U(54), preset_cb, (void*)(intptr_t)-1, COL_ACCENT);
+    lv_obj_set_style_text_font(cd, FONT(12), 0);
 
     ui_set_update(temp_update);
 }
@@ -209,9 +209,9 @@ static void move_update() {
 
 void scr_move(lv_obj_t* p) {
     const bool P = PORTRAIT;  // portrait: bigger jog pad on top, distances + actions below
-    const lv_coord_t padW = P ? CONTENT_W - 12 : 268;
-    lv_obj_t* c = ui_card(p, 6, 6, padW, P ? 250 : 268);
-    const int B = P ? 72 : 62, G = 6;
+    const lv_coord_t padW = P ? CONTENT_W - U(12) : U(268);
+    lv_obj_t* c = ui_card(p, U(6), U(6), padW, P ? U(250) : U(268));
+    const int B = P ? U(72) : U(62), G = U(6);  // jog button size and gap
     struct J { const char* t; int x, y; int j; };
     const J pad[] = {
         {LV_SYMBOL_UP "\nY+", 1, 0, J_YP}, {LV_SYMBOL_LEFT " X-", 0, 1, J_XN},
@@ -219,47 +219,47 @@ void scr_move(lv_obj_t* p) {
     };
     for (auto& k : pad) {
         lv_obj_t* b = ui_btn(c, k.t, B, B, jog_cb, (void*)(intptr_t)k.j);
-        lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
-        lv_obj_set_pos(b, k.x * (B + G), 4 + k.y * (B + G));
+        lv_obj_set_style_text_font(b, FONT(14), 0);
+        lv_obj_set_pos(b, k.x * (B + G), U(4) + k.y * (B + G));
     }
     lv_obj_t* hxy = ui_btn(c, LV_SYMBOL_HOME "\nXY", B, B, gcode_btn_cb, (void*)"G28 X Y", COL_ACCENT);
-    lv_obj_set_style_text_font(hxy, &lv_font_montserrat_14, 0);
-    lv_obj_set_pos(hxy, B + G, 4 + B + G);
+    lv_obj_set_style_text_font(hxy, FONT(14), 0);
+    lv_obj_set_pos(hxy, B + G, U(4) + B + G);
 
-    const lv_coord_t zx = 3 * (B + G), zw = padW - 16 - zx;
+    const lv_coord_t zx = 3 * (B + G), zw = padW - U(16) - zx;
     lv_obj_t* zp = ui_btn(c, LV_SYMBOL_UP "\nZ+", zw, B, jog_cb, (void*)(intptr_t)J_ZP);
-    lv_obj_set_pos(zp, zx, 4);
+    lv_obj_set_pos(zp, zx, U(4));
     lv_obj_t* hz = ui_btn(c, LV_SYMBOL_HOME "\nZ", zw, B, gcode_btn_cb, (void*)"G28 Z", COL_ACCENT);
-    lv_obj_set_pos(hz, zx, 4 + B + G);
+    lv_obj_set_pos(hz, zx, U(4) + B + G);
     lv_obj_t* zn = ui_btn(c, LV_SYMBOL_DOWN "\nZ-", zw, B, jog_cb, (void*)(intptr_t)J_ZN);
-    lv_obj_set_pos(zn, zx, 4 + 2 * (B + G));
+    lv_obj_set_pos(zn, zx, U(4) + 2 * (B + G));
     lv_obj_t* zb[] = {zp, hz, zn};
-    for (lv_obj_t* b : zb) lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
+    for (lv_obj_t* b : zb) lv_obj_set_style_text_font(b, FONT(14), 0);
 
-    const lv_coord_t rw = P ? CONTENT_W - 12 : 194, iw = rw - 16;
-    lv_obj_t* r = P ? ui_card(p, 6, 262, rw, CONTENT_H - 268) : ui_card(p, 280, 6, rw, 268);
-    mPos = ui_label(r, "", &lv_font_montserrat_12);
-    lv_obj_t* dl = ui_label(r, "Distance (mm)", &lv_font_montserrat_12, COL_DIM);
+    const lv_coord_t rw = P ? CONTENT_W - U(12) : U(194), iw = rw - U(16);
+    lv_obj_t* r = P ? ui_card(p, U(6), U(262), rw, CONTENT_H - U(268)) : ui_card(p, U(280), U(6), rw, U(268));
+    mPos = ui_label(r, "", FONT(12));
+    lv_obj_t* dl = ui_label(r, "Distance (mm)", FONT(12), COL_DIM);
     if (P) lv_obj_align(dl, LV_ALIGN_TOP_RIGHT, 0, 0);
-    else lv_obj_set_pos(dl, 0, 36);
-    lv_obj_t* dr = ui_row(r, iw, 34);
-    lv_obj_set_pos(dr, 0, P ? 34 : 52);
-    lv_obj_set_style_pad_column(dr, 3, 0);
+    else lv_obj_set_pos(dl, 0, U(36));
+    lv_obj_t* dr = ui_row(r, iw, U(34));
+    lv_obj_set_pos(dr, 0, P ? U(34) : U(52));
+    lv_obj_set_style_pad_column(dr, U(3), 0);
     static const char* dn[] = {"0.1", "1", "10", "50", "100"};
     for (int i = 0; i < 5; i++) {
-        mDistBtns[i] = ui_btn(dr, dn[i], (iw - 12) / 5, 34, dist_cb, (void*)(intptr_t)i);
-        lv_obj_set_style_text_font(mDistBtns[i], &lv_font_montserrat_12, 0);
+        mDistBtns[i] = ui_btn(dr, dn[i], (iw - U(12)) / 5, U(34), dist_cb, (void*)(intptr_t)i);
+        lv_obj_set_style_text_font(mDistBtns[i], FONT(12), 0);
         ui_select(mDistBtns[i], i == mDistSel);
     }
 
-    lv_obj_t* col = P ? make_scroll_col(r, 0, 74, iw, CONTENT_H - 268 - 16 - 74) : make_scroll_col(r, 0, 94, iw, 158);
+    lv_obj_t* col = P ? make_scroll_col(r, 0, U(74), iw, CONTENT_H - U(268) - U(16) - U(74)) : make_scroll_col(r, 0, U(94), iw, U(158));
     if (P) {
         lv_obj_set_flex_flow(col, LV_FLEX_FLOW_ROW_WRAP);
-        lv_obj_set_style_pad_column(col, 4, 0);
+        lv_obj_set_style_pad_column(col, U(4), 0);
     }
     auto act = [&](const char* t, lv_event_cb_t cb, void* ud, lv_color_t colr) {
-        lv_obj_t* b = ui_btn(col, t, P ? (iw - 4) / 2 : iw, 36, cb, ud, colr);
-        lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
+        lv_obj_t* b = ui_btn(col, t, P ? (iw - U(4)) / 2 : iw, U(36), cb, ud, colr);
+        lv_obj_set_style_text_font(b, FONT(14), 0);
     };
     act(LV_SYMBOL_HOME " Home All", gcode_btn_cb, (void*)"G28", COL_ACCENT);
     if (g.hasQgl) act("Quad Gantry Level", gcode_btn_cb, (void*)"QUAD_GANTRY_LEVEL", COL_BTN);
@@ -313,66 +313,66 @@ static void extrude_update() {
 
 void scr_extrude(lv_obj_t* p) {
     const bool P = PORTRAIT;
-    const lv_coord_t fw = CONTENT_W - 12, fiw = fw - 16;
-    lv_obj_t* c = ui_card(p, 6, 6, fw, P ? 92 : 74);
-    eTemp = ui_label(c, "", &lv_font_montserrat_16);
-    eWarn = ui_label(c, LV_SYMBOL_WARNING " Too cold to extrude", &lv_font_montserrat_12, COL_ORANGE);
-    if (P) lv_obj_set_pos(eWarn, 0, 22);
-    else lv_obj_align(eWarn, LV_ALIGN_TOP_RIGHT, 0, 2);
-    lv_obj_t* hr = ui_row(c, fiw, 32);
+    const lv_coord_t fw = CONTENT_W - U(12), fiw = fw - U(16);
+    lv_obj_t* c = ui_card(p, U(6), U(6), fw, P ? U(92) : U(74));
+    eTemp = ui_label(c, "", FONT(16));
+    eWarn = ui_label(c, LV_SYMBOL_WARNING " Too cold to extrude", FONT(12), COL_ORANGE);
+    if (P) lv_obj_set_pos(eWarn, 0, U(22));
+    else lv_obj_align(eWarn, LV_ALIGN_TOP_RIGHT, 0, U(2));
+    lv_obj_t* hr = ui_row(c, fiw, U(32));
     lv_obj_align(hr, LV_ALIGN_BOTTOM_LEFT, 0, 0);
     static const int heats[] = {200, 220, 240, 250};
     for (int t : heats) {
         char b[16];
         snprintf(b, sizeof(b), "%d" DEG, t);
-        lv_obj_t* bt = ui_btn(hr, b, (fiw - 24) / 5, 32, eheat_cb, (void*)(intptr_t)t, COL_ORANGE);
-        lv_obj_set_style_text_font(bt, &lv_font_montserrat_14, 0);
+        lv_obj_t* bt = ui_btn(hr, b, (fiw - U(24)) / 5, U(32), eheat_cb, (void*)(intptr_t)t, COL_ORANGE);
+        lv_obj_set_style_text_font(bt, FONT(14), 0);
     }
-    lv_obj_t* off = ui_btn(hr, "Off", (fiw - 24) / 5, 32, eheat_cb, (void*)(intptr_t)0, COL_ACCENT);
-    lv_obj_set_style_text_font(off, &lv_font_montserrat_14, 0);
+    lv_obj_t* off = ui_btn(hr, "Off", (fiw - U(24)) / 5, U(32), eheat_cb, (void*)(intptr_t)0, COL_ACCENT);
+    lv_obj_set_style_text_font(off, FONT(14), 0);
 
-    const lv_coord_t sw = P ? fw : 236, siw = sw - 16;
-    lv_obj_t* s = P ? ui_card(p, 6, 104, sw, 150) : ui_card(p, 6, 86, sw, 188);
-    ui_label(s, "Length (mm)", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_t* lr = ui_row(s, siw, 42);
-    lv_obj_set_pos(lr, 0, 18);
-    lv_obj_set_style_pad_column(lr, 4, 0);
+    const lv_coord_t sw = P ? fw : U(236), siw = sw - U(16);
+    lv_obj_t* s = P ? ui_card(p, U(6), U(104), sw, U(150)) : ui_card(p, U(6), U(86), sw, U(188));
+    ui_label(s, "Length (mm)", FONT(12), COL_DIM);
+    lv_obj_t* lr = ui_row(s, siw, U(42));
+    lv_obj_set_pos(lr, 0, U(18));
+    lv_obj_set_style_pad_column(lr, U(4), 0);
     for (int i = 0; i < 5; i++) {
         char b[8];
         snprintf(b, sizeof(b), "%d", eLen[i]);
-        eLenBtns[i] = ui_btn(lr, b, (siw - 16) / 5, 42, elen_cb, (void*)(intptr_t)i);
-        lv_obj_set_style_text_font(eLenBtns[i], &lv_font_montserrat_14, 0);
+        eLenBtns[i] = ui_btn(lr, b, (siw - U(16)) / 5, U(42), elen_cb, (void*)(intptr_t)i);
+        lv_obj_set_style_text_font(eLenBtns[i], FONT(14), 0);
         ui_select(eLenBtns[i], i == eLenSel);
     }
-    lv_obj_t* sl = ui_label(s, "Speed (mm/s)", &lv_font_montserrat_12, COL_DIM);
-    lv_obj_set_pos(sl, 0, P ? 66 : 76);
-    lv_obj_t* sr = ui_row(s, siw, 42);
-    lv_obj_set_pos(sr, 0, P ? 84 : 94);
-    lv_obj_set_style_pad_column(sr, 4, 0);
+    lv_obj_t* sl = ui_label(s, "Speed (mm/s)", FONT(12), COL_DIM);
+    lv_obj_set_pos(sl, 0, P ? U(66) : U(76));
+    lv_obj_t* sr = ui_row(s, siw, U(42));
+    lv_obj_set_pos(sr, 0, P ? U(84) : U(94));
+    lv_obj_set_style_pad_column(sr, U(4), 0);
     for (int i = 0; i < 4; i++) {
         char b[8];
         snprintf(b, sizeof(b), "%d", eSpd[i]);
-        eSpdBtns[i] = ui_btn(sr, b, (siw - 12) / 4, 42, espd_cb, (void*)(intptr_t)i);
-        lv_obj_set_style_text_font(eSpdBtns[i], &lv_font_montserrat_14, 0);
+        eSpdBtns[i] = ui_btn(sr, b, (siw - U(12)) / 4, U(42), espd_cb, (void*)(intptr_t)i);
+        lv_obj_set_style_text_font(eSpdBtns[i], FONT(14), 0);
         ui_select(eSpdBtns[i], i == eSpdSel);
     }
 
-    const lv_coord_t aw = P ? fw : 226, bw = (aw - 16 - 6) / 2;
-    lv_obj_t* a = P ? ui_card(p, 6, 260, aw, CONTENT_H - 266) : ui_card(p, 248, 86, aw, 188);
-    eBtnE = ui_btn(a, LV_SYMBOL_DOWN "\nExtrude", bw, P ? 76 : 82, extrude_cb, (void*)(intptr_t)1, COL_GREEN);
-    eBtnR = ui_btn(a, LV_SYMBOL_UP "\nRetract", bw, P ? 76 : 82, extrude_cb, (void*)(intptr_t)-1);
-    lv_obj_set_pos(eBtnR, bw + 6, 0);
-    lv_obj_set_style_text_font(eBtnE, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_font(eBtnR, &lv_font_montserrat_14, 0);
+    const lv_coord_t aw = P ? fw : U(226), bw = (aw - U(16) - U(6)) / 2;
+    lv_obj_t* a = P ? ui_card(p, U(6), U(260), aw, CONTENT_H - U(266)) : ui_card(p, U(248), U(86), aw, U(188));
+    eBtnE = ui_btn(a, LV_SYMBOL_DOWN "\nExtrude", bw, P ? U(76) : U(82), extrude_cb, (void*)(intptr_t)1, COL_GREEN);
+    eBtnR = ui_btn(a, LV_SYMBOL_UP "\nRetract", bw, P ? U(76) : U(82), extrude_cb, (void*)(intptr_t)-1);
+    lv_obj_set_pos(eBtnR, bw + U(6), 0);
+    lv_obj_set_style_text_font(eBtnE, FONT(14), 0);
+    lv_obj_set_style_text_font(eBtnR, FONT(14), 0);
     if (has_macro("LOAD_FILAMENT")) {
-        lv_obj_t* b = ui_btn(a, "Load\nfilament", bw, P ? 70 : 80, gcode_btn_cb, (void*)"LOAD_FILAMENT");
-        lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
-        lv_obj_set_pos(b, 0, P ? 82 : 92);
+        lv_obj_t* b = ui_btn(a, "Load\nfilament", bw, P ? U(70) : U(80), gcode_btn_cb, (void*)"LOAD_FILAMENT");
+        lv_obj_set_style_text_font(b, FONT(14), 0);
+        lv_obj_set_pos(b, 0, P ? U(82) : U(92));
     }
     if (has_macro("UNLOAD_FILAMENT")) {
-        lv_obj_t* b = ui_btn(a, "Unload\nfilament", bw, P ? 70 : 80, gcode_btn_cb, (void*)"UNLOAD_FILAMENT");
-        lv_obj_set_style_text_font(b, &lv_font_montserrat_14, 0);
-        lv_obj_set_pos(b, bw + 6, P ? 82 : 92);
+        lv_obj_t* b = ui_btn(a, "Unload\nfilament", bw, P ? U(70) : U(80), gcode_btn_cb, (void*)"UNLOAD_FILAMENT");
+        lv_obj_set_style_text_font(b, FONT(14), 0);
+        lv_obj_set_pos(b, bw + U(6), P ? U(82) : U(92));
     }
     ui_set_update(extrude_update);
 }
@@ -413,25 +413,27 @@ static void add_slider_row(lv_obj_t* col, const char* name, int min, int max, in
     int i = fCount++;
     fFanIdx[i] = idx;
     fRows[i].touchedAt = 0;
-    lv_obj_t* r = ui_row(col, CONTENT_W - 24, 46);
+    lv_obj_t* r = ui_row(col, CONTENT_W - U(24), U(46));
     set_bg_color(r, COL_CARD, 0);
     lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-    lv_obj_set_style_radius(r, 8, 0);
-    lv_obj_set_style_pad_hor(r, 10, 0);
-    lv_obj_set_style_pad_column(r, 14, 0);
-    lv_obj_t* l = ui_label(r, name, &lv_font_montserrat_14);
-    lv_obj_set_width(l, PORTRAIT ? 90 : 130);
+    lv_obj_set_style_radius(r, U(8), 0);
+    lv_obj_set_style_pad_hor(r, U(10), 0);
+    lv_obj_set_style_pad_column(r, U(14), 0);
+    lv_obj_t* l = ui_label(r, name, FONT(14));
+    lv_obj_set_width(l, PORTRAIT ? U(90) : U(130));
     lv_label_set_long_mode(l, LV_LABEL_LONG_DOT);
     lv_obj_t* s = lv_slider_create(r);
-    lv_obj_set_width(s, PORTRAIT ? 140 : 220);
-    lv_obj_set_height(s, 12);
-    lv_obj_set_ext_click_area(s, 18);
+    lv_obj_set_flex_grow(s, 1);  // slider takes what the name and value leave
+    lv_obj_set_height(s, U(12));
+    lv_obj_set_ext_click_area(s, U(18));
     lv_slider_set_range(s, min, max);
     if (readonly) lv_obj_add_state(s, LV_STATE_DISABLED);
     lv_obj_add_event_cb(s, slider_changed, LV_EVENT_VALUE_CHANGED, (void*)(intptr_t)i);
     lv_obj_add_event_cb(s, slider_released, LV_EVENT_RELEASED, (void*)(intptr_t)i);
     fRows[i].slider = s;
-    fRows[i].val = ui_label(r, "", &lv_font_montserrat_14);
+    fRows[i].val = ui_label(r, "", FONT(14));
+    lv_obj_set_width(fRows[i].val, U(44));
+    lv_obj_set_style_text_align(fRows[i].val, LV_TEXT_ALIGN_RIGHT, 0);
 }
 
 static void fans_update() {
@@ -450,7 +452,7 @@ static void fans_update() {
 }
 
 void scr_fans(lv_obj_t* p) {
-    lv_obj_t* col = make_scroll_col(p, 6, 6, CONTENT_W - 12, CONTENT_H - 12);
+    lv_obj_t* col = make_scroll_col(p, U(6), U(6), CONTENT_W - U(12), CONTENT_H - U(12));
     fCount = 0;
     add_slider_row(col, "Speed factor", 10, 300, -1, false);
     add_slider_row(col, "Flow", 50, 150, -2, false);
@@ -474,11 +476,11 @@ static void macro_cb(lv_event_t* e) {
 }
 
 static lv_obj_t* macro_cell(lv_obj_t* parent) {
-    lv_obj_t* b = ui_btn(parent, "", PORTRAIT ? 150 : 152, 50, macro_cb, nullptr);
+    lv_obj_t* b = ui_btn(parent, "", PORTRAIT ? U(150) : U(152), U(50), macro_cb, nullptr);
     lv_obj_t* l = lv_obj_get_child(b, 0);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(l, 144);
-    lv_obj_set_style_text_font(l, &lv_font_montserrat_12, 0);
+    lv_obj_set_width(l, U(144));
+    lv_obj_set_style_text_font(l, FONT(12), 0);
     return b;
 }
 
@@ -489,13 +491,13 @@ static void macro_bind(lv_obj_t* b, int i) {
 
 void scr_macros(lv_obj_t* p) {
     if (!g.nMacros) {
-        lv_obj_t* l = ui_label(p, g.ready ? "No macros found" : "Printer not ready", &lv_font_montserrat_16, COL_DIM);
-        lv_obj_set_pos(l, 12, 12);
+        lv_obj_t* l = ui_label(p, g.ready ? "No macros found" : "Printer not ready", FONT(16), COL_DIM);
+        lv_obj_set_pos(l, U(12), U(12));
         return;
     }
-    const lv_coord_t cw = PORTRAIT ? 150 : 152;
-    int cols = (CONTENT_W - 12 + 5) / (cw + 5);
-    lv_obj_t* list = ui_vlist(p, 0, 0, CONTENT_W, CONTENT_H, cw, 50, 5, cols, macro_cell, macro_bind);
+    const lv_coord_t cw = PORTRAIT ? U(150) : U(152);
+    int cols = (CONTENT_W - U(12) + U(5)) / (cw + U(5));
+    lv_obj_t* list = ui_vlist(p, 0, 0, CONTENT_W, CONTENT_H, cw, U(50), U(5), cols, macro_cell, macro_bind);
     ui_vlist_set_count(list, g.nMacros);
 }
 
@@ -534,33 +536,33 @@ static void power_build() {
     pwCount = g.nPower;
     if (!pwCount) {
         ui_label(pwCol, g.online ? "No power devices configured in Moonraker\n([power ...] sections in moonraker.conf)"
-                                 : "Moonraker is not reachable", &lv_font_montserrat_14, COL_DIM);
+                                 : "Moonraker is not reachable", FONT(14), COL_DIM);
         return;
     }
     for (int i = 0; i < pwCount; i++) {
-        lv_obj_t* b = ui_btn(pwCol, "", CONTENT_W - 24, 50, power_cb, (void*)(intptr_t)i, COL_CARD);
+        lv_obj_t* b = ui_btn(pwCol, "", CONTENT_W - U(24), U(50), power_cb, (void*)(intptr_t)i, COL_CARD);
         lv_obj_t* l = lv_obj_get_child(b, 0);
         set_text(l, g.power[i].name);
-        lv_obj_align(l, LV_ALIGN_LEFT_MID, 12, 0);
+        lv_obj_align(l, LV_ALIGN_LEFT_MID, U(12), 0);
         pwSw[i] = lv_switch_create(b);
-        lv_obj_set_size(pwSw[i], 60, 30);
-        lv_obj_align(pwSw[i], LV_ALIGN_RIGHT_MID, -12, 0);
+        lv_obj_set_size(pwSw[i], U(60), U(30));
+        lv_obj_align(pwSw[i], LV_ALIGN_RIGHT_MID, -U(12), 0);
         lv_obj_clear_flag(pwSw[i], LV_OBJ_FLAG_CLICKABLE);
     }
     // option: firmware-restart Klipper after switching a device on (the printer board needs it after power loss)
     lv_obj_t* row = lv_obj_create(pwCol);
-    lv_obj_set_size(row, CONTENT_W - 24, 50);
+    lv_obj_set_size(row, CONTENT_W - U(24), U(50));
     lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(row, 0, 0);
     lv_obj_set_style_pad_all(row, 0, 0);
     lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_t* l = ui_label(row, "Restart Klipper after power on", &lv_font_montserrat_14, COL_DIM);
+    lv_obj_t* l = ui_label(row, "Restart Klipper after power on", FONT(14), COL_DIM);
     lv_label_set_long_mode(l, LV_LABEL_LONG_WRAP);
-    lv_obj_set_width(l, CONTENT_W - 24 - 84);
-    lv_obj_align(l, LV_ALIGN_LEFT_MID, 12, 0);
+    lv_obj_set_width(l, CONTENT_W - U(24) - U(84));
+    lv_obj_align(l, LV_ALIGN_LEFT_MID, U(12), 0);
     lv_obj_t* sw = lv_switch_create(row);
-    lv_obj_set_size(sw, 60, 30);
-    lv_obj_align(sw, LV_ALIGN_RIGHT_MID, -12, 0);
+    lv_obj_set_size(sw, U(60), U(30));
+    lv_obj_align(sw, LV_ALIGN_RIGHT_MID, -U(12), 0);
     if (cfg.powerRestart) lv_obj_add_state(sw, LV_STATE_CHECKED);
     lv_obj_add_event_cb(sw, [](lv_event_t* e) {
         cfg.powerRestart = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
@@ -577,7 +579,7 @@ static void power_update() {
 }
 
 void scr_power(lv_obj_t* p) {
-    pwCol = make_scroll_col(p, 6, 6, CONTENT_W - 12, CONTENT_H - 12);
+    pwCol = make_scroll_col(p, U(6), U(6), CONTENT_W - U(12), CONTENT_H - U(12));
     power_build();
     ui_set_update(power_update);
 }
