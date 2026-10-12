@@ -132,7 +132,7 @@ static void handle_scan() {
 static void handle_root() {
     if (captive_redirect()) return;
     String h = F("<!doctype html><html><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
-                 "<title>KlippESP</title><link rel=icon type=image/png href=/logo.png><style>body{font-family:sans-serif;max-width:480px;margin:24px auto;padding:0 16px;"
+                 "<title>KlippESP</title><link rel=icon type=image/png href=/logo.png?v=" WEB_LOGO_VER "><style>body{font-family:sans-serif;max-width:480px;margin:24px auto;padding:0 16px;"
                  "background:#0d1117;color:#e6edf3}label{display:block;margin-top:14px;color:#8b949e}input{width:100%;padding:10px;"
                  "box-sizing:border-box;font-size:16px;background:#1c2330;color:#e6edf3;border:1px solid #30363d;border-radius:6px}"
                  "button{margin-top:20px;width:100%;padding:12px;font-size:17px;background:#2ea043;color:#fff;border:0;border-radius:6px}"
@@ -151,7 +151,7 @@ static void handle_root() {
                  ".catch(function(){$('nl').innerHTML='<p>Scan failed, try again.</p>'})"
                  ".finally(function(){b.disabled=false;b.textContent='Rescan'})}"
                  "function nets(){$('dlg').showModal();if(!$('nl').querySelector('.net'))rescan()}"
-                 "</script></head><body><div style='text-align:center'><img src=/logo.png width=128 height=128 alt='' "
+                 "</script></head><body><div style='text-align:center'><img src=/logo.png?v=" WEB_LOGO_VER " width=128 height=128 alt='' "
                  "style='border-radius:18px'></div><h2 style='text-align:center'>KlippESP settings</h2><form method=post action=/save>");
     h += "<label>Wi-Fi network (SSID)</label><div class=row><input name=ssid id=ssid value=\"" + esc(cfg.ssid) +
          "\"><button type=button onclick=nets()>Choose&hellip;</button></div>";

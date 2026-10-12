@@ -498,3 +498,5 @@ static const uint8_t WEB_LOGO_PNG[] = {
     0xAE,0x42,0x60,0x82,
 };
 static const size_t WEB_LOGO_PNG_LEN = sizeof(WEB_LOGO_PNG);
+// changes with the image; appended to /logo.png so browsers fetch a new logo instead of a cached one
+#define WEB_LOGO_VER "03c0fa5d"

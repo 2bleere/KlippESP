@@ -8,6 +8,7 @@ The visible artwork (anything brighter than the background) is detected and crop
 small margin, so any logo on a plain dark background works in landscape and portrait.
 """
 import io
+import zlib
 import os
 import sys
 
@@ -71,7 +72,9 @@ def main():
           "static const uint8_t WEB_LOGO_PNG[] = {"]
     for i in range(0, len(png), 24):
         hl.append("    " + ",".join("0x%02X" % b for b in png[i:i + 24]) + ",")
-    hl += ["};", "static const size_t WEB_LOGO_PNG_LEN = sizeof(WEB_LOGO_PNG);", ""]
+    hl += ["};", "static const size_t WEB_LOGO_PNG_LEN = sizeof(WEB_LOGO_PNG);",
+           "// changes with the image; appended to /logo.png so browsers fetch a new logo instead of a cached one",
+           '#define WEB_LOGO_VER "%08x"' % zlib.crc32(png), ""]
     open(os.path.join(ROOT, "src", "web_logo.h"), "w").write("\n".join(hl))
     crop.resize((BOOT_SIZE, BOOT_SIZE), Image.LANCZOS).save(os.path.join(ROOT, "assets", "boot_logo_preview.png"))
     print("frame %s, crop %s, bg #%02X%02X%02X, boot %d bytes, web png %d bytes" % ((x0, y0, x1, y1), box, *bg, len(data), len(png)))
