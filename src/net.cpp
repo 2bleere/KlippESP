@@ -425,7 +425,11 @@ void net_begin() {
             server.send(404, "text/plain", "This display keeps the image in the panel; no screenshot available.");
             return;
         }
-        const uint32_t w = LCD_LONG, h = LCD_SHORT, row = w * 2, data = row * h, off = 14 + 40 + 12;
+        // output as the viewer sees it: undo the rotation LVGL applies when drawing into the panel's buffer
+        const uint8_t rot = cfg.rotation & 3;
+        const uint32_t PW = LCD_LONG, PH = LCD_SHORT;  // physical frame buffer
+        const uint32_t w = (rot & 1) ? PH : PW, h = (rot & 1) ? PW : PH, row = w * 2, data = row * h,
+                       off = 14 + 40 + 12;
         uint8_t hdr[off] = {'B', 'M'};
         auto put32 = [&](int at, uint32_t v) { memcpy(hdr + at, &v, 4); };
         put32(2, off + data);
@@ -443,11 +447,19 @@ void net_begin() {
         server.setContentLength(off + data);
         server.send(200, "image/bmp", "");
         server.sendContent((const char*)hdr, off);
-        uint8_t* buf = (uint8_t*)malloc(row * 8);  // 8 rows at a time, only while sending
-        for (uint32_t y = 0; buf && y < h; y += 8) {
-            uint32_t n = std::min<uint32_t>(8, h - y) * row;
-            memcpy(buf, (const uint8_t*)fb + y * row, n);
-            server.sendContent((const char*)buf, n);
+        uint16_t* buf = (uint16_t*)malloc(row);  // one output row at a time, only while sending
+        for (uint32_t y = 0; buf && y < h; y++) {
+            for (uint32_t x = 0; x < w; x++) {
+                uint32_t px, py;  // physical pixel for logical (x, y), as lv_refr's rotate_area maps it
+                switch (rot) {
+                    case 1: px = y; py = PH - 1 - x; break;
+                    case 2: px = PW - 1 - x; py = PH - 1 - y; break;
+                    case 3: px = PW - 1 - y; py = x; break;
+                    default: px = x; py = y;
+                }
+                buf[x] = fb[py * PW + px];
+            }
+            server.sendContent((const char*)buf, row);
         }
         free(buf);
     });
