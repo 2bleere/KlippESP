@@ -37,8 +37,8 @@ A red **E-STOP** is always in the top bar.
 
 ## Build & first flash
 
-Install [PlatformIO](https://platformio.org/) **Core 6.1.19** (the pioarduino platform for Arduino core 3.3 /
-ESP-IDF 5.5 doesn't work with Core 6.2: `pip install platformio==6.1.19`), connect the board by USB, then:
+Install [PlatformIO](https://platformio.org/) **Core 6.2 or newer** (the pioarduino platform for Arduino core 3.3.12 /
+ESP-IDF 5.5.5 requires it), connect the board by USB, then:
 
 ```bash
 pio run -e waveshare_s3_lcd7 -t upload
