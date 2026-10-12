@@ -3,7 +3,9 @@
 #include "board.h"
 #include <WiFi.h>
 
-#define FW_VERSION "1.0.0"
+#include "version.h"
+#include "about.h"
+#include "ui_icons.h"
 
 static lv_obj_t* make_kb(lv_obj_t* p, lv_event_cb_t cb) {
     lv_obj_t* kb = lv_keyboard_create(p);
@@ -112,10 +114,45 @@ void scr_settings(lv_obj_t* p) {
     lv_obj_t* g2 = ui_row(p, 784, 200);
     lv_obj_set_pos(g2, 8, 8);
     lv_obj_set_style_pad_column(g2, 12, 0);
-    ui_tile(g2, LV_SYMBOL_WIFI, "Connection", 187, 160, goto_cb, (void*)(intptr_t)S_CONNECT, COL_ACCENT);
-    ui_tile(g2, LV_SYMBOL_SETTINGS, "System", 187, 160, goto_cb, (void*)(intptr_t)S_SYSTEM);
-    ui_tile(g2, LV_SYMBOL_POWER, "Power devices", 187, 160, goto_cb, (void*)(intptr_t)S_POWER);
-    ui_tile(g2, LV_SYMBOL_KEYBOARD, "Console", 187, 160, goto_cb, (void*)(intptr_t)S_CONSOLE);
+    ui_tile(g2, LV_SYMBOL_WIFI, "Connection", 147, 160, goto_cb, (void*)(intptr_t)S_CONNECT, COL_ACCENT);
+    ui_tile(g2, LV_SYMBOL_SETTINGS, "System", 147, 160, goto_cb, (void*)(intptr_t)S_SYSTEM);
+    ui_tile(g2, LV_SYMBOL_POWER, "Power devices", 147, 160, goto_cb, (void*)(intptr_t)S_POWER);
+    ui_tile(g2, LV_SYMBOL_KEYBOARD, "Console", 147, 160, goto_cb, (void*)(intptr_t)S_CONSOLE);
+    ui_tile(g2, ICON_CHIP, "About", 147, 160, goto_cb, (void*)(intptr_t)S_ABOUT);
+}
+
+// ================================================================ ABOUT
+
+static lv_obj_t* abVal[ABOUT_MAX];
+static int abCount;
+
+static void about_update() {
+    AboutItem it[ABOUT_MAX];
+    int n = about_collect(it, ABOUT_MAX);
+    for (int i = 0; i < n && i < abCount; i++) set_text(abVal[i], it[i].value);  // uptime / free memory change
+}
+
+void scr_about(lv_obj_t* p) {
+    lv_obj_t* c = ui_card(p, 8, 8, CONTENT_W - 16, CONTENT_H - 16);
+    lv_obj_t* t = ui_label(c, "KlippESP v" FW_VERSION, &lv_font_montserrat_32);
+    lv_obj_set_pos(t, 4, 0);
+    lv_obj_t* s = ui_label(c, "Wireless Klipper control", &lv_font_montserrat_20, COL_ACCENT);
+    lv_obj_set_pos(s, 6, 42);
+    // two columns of key / value rows
+    AboutItem it[ABOUT_MAX];
+    abCount = about_collect(it, ABOUT_MAX);
+    const int perCol = (abCount + 1) / 2;
+    const lv_coord_t colW = (CONTENT_W - 16 - 32) / 2, kw = 140;
+    for (int i = 0; i < abCount; i++) {
+        lv_coord_t x = (i / perCol) * (colW + 16), y = 90 + (i % perCol) * 40;
+        lv_obj_t* k = ui_label(c, it[i].key, &lv_font_montserrat_16, COL_DIM);
+        lv_obj_set_pos(k, x, y);
+        abVal[i] = ui_label(c, it[i].value, &lv_font_montserrat_16);
+        lv_label_set_long_mode(abVal[i], LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(abVal[i], colW - kw);
+        lv_obj_set_pos(abVal[i], x + kw, y);
+    }
+    ui_set_update(about_update);
 }
 
 // ================================================================ CONNECTION

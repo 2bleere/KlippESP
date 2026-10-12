@@ -25,11 +25,11 @@ static int sp = 0;
 
 static const char* titles[S_COUNT] = {
     "KlippESP", "Print", "Printing", "Temperature", "Move", "Extrude", "Fans & Speed", "Macros",
-    "Console", "Power", "Settings", "Connection", "System", "Z Offset"};
+    "Console", "Power", "Settings", "Connection", "System", "Z Offset", "About"};
 
 static void (*builders[S_COUNT])(lv_obj_t*) = {
     scr_home, scr_files, scr_printing, scr_temp, scr_move, scr_extrude, scr_fans, scr_macros,
-    scr_console, scr_power, scr_settings, scr_connect, scr_system, scr_zoffset};
+    scr_console, scr_power, scr_settings, scr_connect, scr_system, scr_zoffset, scr_about};
 
 bool is_printing() { return !strcmp(g.pstate, "printing") || !strcmp(g.pstate, "paused"); }
 
@@ -499,7 +499,7 @@ void ui_boot_logo() {
 
 static void preview_cb(lv_timer_t*) {
     static const Scr order[] = {S_HOME, S_PRINTING, S_FILES, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,
-                                S_CONSOLE, S_POWER, S_SETTINGS, S_SYSTEM, S_ZOFFSET, S_CONNECT};
+                                S_CONSOLE, S_POWER, S_SETTINGS, S_SYSTEM, S_ZOFFSET, S_CONNECT, S_ABOUT};
     static int i = 0;
     i = (i + 1) % (int)(sizeof(order) / sizeof(order[0]));
     ui_goto(order[i]);

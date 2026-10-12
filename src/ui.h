@@ -21,7 +21,7 @@
 
 enum Scr {
     S_HOME, S_FILES, S_PRINTING, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,
-    S_CONSOLE, S_POWER, S_SETTINGS, S_CONNECT, S_SYSTEM, S_ZOFFSET, S_COUNT
+    S_CONSOLE, S_POWER, S_SETTINGS, S_CONNECT, S_SYSTEM, S_ZOFFSET, S_ABOUT, S_COUNT
 };
 
 extern MrState g;  // latest printer snapshot, refreshed by the UI timer
@@ -69,6 +69,7 @@ void scr_home(lv_obj_t* p);
 void scr_files(lv_obj_t* p);
 void scr_printing(lv_obj_t* p);
 void scr_zoffset(lv_obj_t* p);
+void scr_about(lv_obj_t* p);
 void scr_temp(lv_obj_t* p);
 void scr_move(lv_obj_t* p);
 void scr_extrude(lv_obj_t* p);
