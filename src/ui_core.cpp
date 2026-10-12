@@ -36,11 +36,11 @@ static int sp = 0;
 
 static const char* titles[S_COUNT] = {
     "KlippESP", "Print", "Printing", "Temperature", "Move", "Extrude", "Fans & Speed", "Macros",
-    "Console", "Power", "Settings", "Connection", "System", "Z Offset", "Date & Time"};
+    "Console", "Power", "Settings", "Connection", "System", "Z Offset", "Date & Time", "About"};
 
 static void (*builders[S_COUNT])(lv_obj_t*) = {
     scr_home, scr_files, scr_printing, scr_temp, scr_move, scr_extrude, scr_fans, scr_macros,
-    scr_console, scr_power, scr_settings, scr_connect, scr_system, scr_zoffset, scr_time};
+    scr_console, scr_power, scr_settings, scr_connect, scr_system, scr_zoffset, scr_time, scr_about};
 
 bool is_printing() { return !strcmp(g.pstate, "printing") || !strcmp(g.pstate, "paused"); }
 

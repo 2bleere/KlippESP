@@ -5,7 +5,8 @@
 #include "ui_icons.h"
 #include <WiFi.h>
 
-#define FW_VERSION "1.0.0"
+#include "version.h"
+#include "about.h"
 
 #define KB_H 150  // on-screen keyboard height; inputs must stay above CONTENT_H - KB_H
 
@@ -135,6 +136,51 @@ void scr_settings(lv_obj_t* p) {
     ui_tile(g2, LV_SYMBOL_POWER, "Power devices", w, 110, goto_cb, (void*)(intptr_t)S_POWER);
     ui_tile(g2, LV_SYMBOL_KEYBOARD, "Console", w, 110, goto_cb, (void*)(intptr_t)S_CONSOLE);
     ui_tile(g2, ICON_CLOCK, "Date & Time", w, 110, goto_cb, (void*)(intptr_t)S_TIME);
+    ui_tile(g2, ICON_CHIP, "About", w, 110, goto_cb, (void*)(intptr_t)S_ABOUT);
+}
+
+// ================================================================ ABOUT
+
+static lv_obj_t* abVal[ABOUT_MAX];
+static int abCount;
+
+static void about_update() {
+    AboutItem it[ABOUT_MAX];
+    int n = about_collect(it, ABOUT_MAX);
+    for (int i = 0; i < n && i < abCount; i++) set_text(abVal[i], it[i].value);  // uptime / free memory change
+}
+
+void scr_about(lv_obj_t* p) {
+    const bool P = PORTRAIT;
+    lv_obj_t* c = ui_card(p, 6, 6, CONTENT_W - 12, CONTENT_H - 12);
+    lv_obj_t* t = ui_label(c, "KlippESP v" FW_VERSION, &lv_font_montserrat_28);
+    lv_obj_set_pos(t, 4, 0);
+    lv_obj_t* s = ui_label(c, "Wireless Klipper control", &lv_font_montserrat_14, COL_ACCENT);
+    lv_obj_set_pos(s, 6, 34);
+
+    lv_obj_t* list = lv_obj_create(c);  // key / value rows, scrolls if the screen is short
+    lv_obj_remove_style_all(list);
+    lv_obj_set_pos(list, 0, 60);
+    lv_obj_set_size(list, CONTENT_W - 12 - 24, CONTENT_H - 12 - 24 - 60);
+    lv_obj_set_flex_flow(list, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(list, 3, 0);
+    lv_obj_set_scroll_dir(list, LV_DIR_VER);
+
+    AboutItem it[ABOUT_MAX];
+    abCount = about_collect(it, ABOUT_MAX);
+    const lv_coord_t kw = P ? 110 : 130, rw = CONTENT_W - 12 - 24;
+    for (int i = 0; i < abCount; i++) {
+        lv_obj_t* r = lv_obj_create(list);
+        lv_obj_remove_style_all(r);
+        lv_obj_set_size(r, rw, LV_SIZE_CONTENT);
+        lv_obj_t* k = ui_label(r, it[i].key, &lv_font_montserrat_14, COL_DIM);
+        lv_obj_set_width(k, kw);
+        abVal[i] = ui_label(r, it[i].value, &lv_font_montserrat_14);
+        lv_label_set_long_mode(abVal[i], LV_LABEL_LONG_WRAP);
+        lv_obj_set_width(abVal[i], rw - kw);
+        lv_obj_set_x(abVal[i], kw);
+    }
+    ui_set_update(about_update);
 }
 
 // ================================================================ CONNECTION

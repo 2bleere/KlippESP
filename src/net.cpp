@@ -6,6 +6,8 @@
 #include "clock.h"
 #include "board.h"
 #include "web_logo.h"
+#include "version.h"
+#include "about.h"
 #include <WiFi.h>
 #include <WebServer.h>
 #include <DNSServer.h>
@@ -195,12 +197,24 @@ static void handle_root() {
            "<h3 style='margin-top:32px'>Firmware update</h3><form method=post action=/update enctype=multipart/form-data "
            "onsubmit=\"this.querySelector('button').textContent='Uploading\u2026 (about 30 s)';\">"
            "<input type=file name=fw accept=.bin required><button style='background:#2f81f7'>Upload &amp; install</button>"
-           "<small>Use .pio/build/waveshare_s3_lcd7/firmware.bin. Settings are kept.</small></form>");
+           "<small>Use .pio/build/wt32_sc01/firmware.bin. Settings are kept.</small></form>");
+    // About: same facts as the display's About screen
+    h += F("<details style='margin-top:28px'><summary style='cursor:pointer;color:#8b949e'>About KlippESP v" FW_VERSION
+           "</summary><table style='width:100%;margin-top:8px;font-size:14px;border-collapse:collapse'>");
+    AboutItem it[ABOUT_MAX];
+    int n = about_collect(it, ABOUT_MAX);
+    for (int i = 0; i < n; i++) {
+        String v = esc(it[i].value);
+        if (!strcmp(it[i].key, "Project")) v = String("<a style='color:#2f81f7' href='") + FW_PROJECT_URL + "'>" + v + "</a>";
+        h += String("<tr><td style='color:#8b949e;padding:3px 12px 3px 0;white-space:nowrap;vertical-align:top'>") +
+             it[i].key + "</td><td style='padding:3px 0'>" + v + "</td></tr>";
+    }
+    h += F("</table></details>");
     h += "<dialog id=dlg><h3>Wi-Fi networks</h3><div id=nl>" + nets_html() +
          "</div><div class=btns><button type=button id=rs onclick=rescan()>Rescan</button>"
          "<button type=button onclick=\"$('dlg').close()\">Close</button></div></dialog><p><small>";
     h += WiFi.status() == WL_CONNECTED ? "Connected to " + esc(cfg.ssid) + ", IP " + WiFi.localIP().toString() : String("Not connected to Wi-Fi");
-    h += F("</small></p></body></html>");
+    h += F(" &middot; KlippESP v" FW_VERSION "</small></p></body></html>");
     server.send(200, "text/html", h);
 }
 
@@ -377,10 +391,10 @@ void net_begin() {
         mr_stack_free(&sp, &sc);
         char b[360];
         snprintf(b, sizeof(b),
-                 "{\"idf\":\"%s\",\"built\":\"%s %s\",\"uptime_s\":%lu,\"heap\":%u,\"heap_min\":%u,\"largest\":%u,"
+                 "{\"version\":\"" FW_VERSION "\",\"idf\":\"%s\",\"built\":\"%s\",\"uptime_s\":%lu,\"heap\":%u,\"heap_min\":%u,\"largest\":%u,"
                  "\"lvgl_total\":%u,\"lvgl_peak\":%u,\"lvgl_now\":%u,\"lvgl_used_pct\":%u,\"lvgl_frag_pct\":%u,"
                  "\"stack_free_poll\":%u,\"stack_free_cmd\":%u,\"stack_free_loop\":%u}",
-                 ESP.getSdkVersion(), __DATE__, __TIME__, (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(),
+                 ESP.getSdkVersion(), about_build_time(), (unsigned long)(millis() / 1000), (unsigned)ESP.getFreeHeap(),
                  (unsigned)ESP.getMinFreeHeap(), (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT),
                  (unsigned)m.total_size, (unsigned)ui_lvgl_peak, (unsigned)(m.total_size - m.free_size), (unsigned)m.used_pct, (unsigned)m.frag_pct,
                  (unsigned)sp, (unsigned)sc, (unsigned)uxTaskGetStackHighWaterMark(nullptr));

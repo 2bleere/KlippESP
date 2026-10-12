@@ -25,7 +25,7 @@ extern lv_coord_t SW, SH;  // screen width / height
 
 enum Scr {
     S_HOME, S_FILES, S_PRINTING, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,
-    S_CONSOLE, S_POWER, S_SETTINGS, S_CONNECT, S_SYSTEM, S_ZOFFSET, S_TIME, S_COUNT
+    S_CONSOLE, S_POWER, S_SETTINGS, S_CONNECT, S_SYSTEM, S_ZOFFSET, S_TIME, S_ABOUT, S_COUNT
 };
 
 extern MrState g;  // latest printer snapshot, refreshed by the UI timer
@@ -94,6 +94,7 @@ void scr_settings(lv_obj_t* p);
 void scr_connect(lv_obj_t* p);
 void scr_system(lv_obj_t* p);
 void scr_time(lv_obj_t* p);
+void scr_about(lv_obj_t* p);
 
 bool is_printing();  // printing or paused
 
