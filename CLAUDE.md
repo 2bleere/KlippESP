@@ -1,5 +1,11 @@
 # KlippESP – notes for working on this repo
 
+> **`wt32-idf5` branch:** the WT32 on Arduino core 3.3.11 / ESP-IDF 5.5.5 (pioarduino 55.03.311, LovyanGFX 1.2.28),
+> built with PlatformIO Core 6.1.19 (`~/.pio61/bin/pio`) in its own `core_dir` (`~/.platformio-wt32`) so it doesn't
+> clobber the Waveshare's custom-built core libs. Free heap ~78–81 KB at runtime (min ~62 KB), ~35 KB less than on
+> core 2.0.14. PlatformIO OTA works (~52 s); the browser `/update` upload now gets ~640 KB in, then the board restarts.
+> `/info` returns IDF version, build time, uptime, free/min heap and largest block.
+>
 > **This is the `wt32-sc01` branch:** touch UI only, for the WT32-SC01 (classic ESP32, 4 MB flash, NO PSRAM,
 > ST7796 480×320 SPI + FT6336U, LovyanGFX). Envs: `wt32_sc01`, `wt32_sc01_ota`. Orientation is chosen at boot
 > (`cfg.rotation` 0..3); screen size is runtime: `SW`/`SH`/`PORTRAIT`, `CONTENT_W = SW`, `CONTENT_H = SH - TOPBAR_H`
