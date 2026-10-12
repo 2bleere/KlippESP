@@ -5,6 +5,59 @@
 #include "clock.h"
 #include <time.h>
 
+#if KLIPPESP_THUMBNAILS
+// ---------------------------------------------------------------- thumbnail holder (PSRAM boards)
+
+struct Thumb {
+    MrThumb t = {nullptr, 0, 0, 0};
+    lv_img_dsc_t dsc;
+};
+
+static void thumb_apply(Thumb& th, MrThumb& nt, lv_obj_t* img, lv_coord_t box) {
+    if (img) lv_img_set_src(img, nullptr);
+    lv_img_cache_invalidate_src(nullptr);
+    if (th.t.data) free(th.t.data);
+    th.t = nt;
+    memset(&th.dsc, 0, sizeof(th.dsc));
+    th.dsc.header.always_zero = 0;
+    th.dsc.header.cf = LV_IMG_CF_RAW_ALPHA;
+    th.dsc.header.w = nt.w;
+    th.dsc.header.h = nt.h;
+    th.dsc.data_size = nt.len;
+    th.dsc.data = nt.data;
+    if (img) {
+        lv_img_set_src(img, &th.dsc);
+        uint16_t m = nt.w > nt.h ? nt.w : nt.h;
+        if (m) lv_img_set_zoom(img, (uint16_t)(256L * box / m));
+    }
+}
+
+static void thumb_show(Thumb& th, lv_obj_t* img, lv_coord_t box) {
+    if (!th.t.data || !img) return;
+    lv_img_set_src(img, &th.dsc);
+    uint16_t m = th.t.w > th.t.h ? th.t.w : th.t.h;
+    if (m) lv_img_set_zoom(img, (uint16_t)(256L * box / m));
+}
+
+static Thumb detailThumb, printThumb;
+static char printThumbFile[128];
+
+void ui_print_thumb(lv_obj_t* img, lv_coord_t box) {
+    static lv_obj_t* shown = nullptr;
+    MrThumb nt;
+    if (mr_take_thumb(THUMB_PRINT, &nt)) {
+        thumb_apply(printThumb, nt, img, box);
+        strlcpy(printThumbFile, g.file, sizeof(printThumbFile));
+        shown = img;
+    } else if (shown != img && printThumb.t.data && !strcmp(printThumbFile, g.file)) {
+        thumb_show(printThumb, img, box);
+        shown = img;
+    }
+}
+
+bool ui_print_thumb_shown() { return printThumb.t.data && printThumb.t.len && !strcmp(printThumbFile, g.file); }
+#endif
+
 static const char* basename_of(const char* p) {
     const char* s = strrchr(p, '/');
     return s ? s + 1 : p;
@@ -20,6 +73,10 @@ static int fCountN;  // entries in the Moonraker file list
 // detail dialog
 static lv_obj_t* dOverlay;
 static lv_obj_t* dInfo;
+#if KLIPPESP_THUMBNAILS
+static lv_obj_t* dImg;
+static lv_coord_t dImgBox;
+#endif
 static char dFile[128];
 static uint32_t dMetaVer;
 
@@ -39,6 +96,10 @@ static void detail_print(lv_event_t*) {
 
 static void open_detail(const char* file) {
     strlcpy(dFile, file, sizeof(dFile));
+#if KLIPPESP_THUMBNAILS
+    MrThumb stale;
+    if (mr_take_thumb(THUMB_DETAIL, &stale)) free(stale.data);
+#endif
     MrMeta m;
     dMetaVer = mr_meta(&m);
     mr_request_meta(file);
@@ -66,6 +127,11 @@ static void open_detail(const char* file) {
     lv_obj_clear_flag(box, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_t* ph = ui_label(box, ICON_CUBE, &icons_28, COL_DIM);
     lv_obj_center(ph);
+#if KLIPPESP_THUMBNAILS
+    dImgBox = PORTRAIT ? 90 : 140;
+    dImg = lv_img_create(box);
+    lv_obj_center(dImg);
+#endif
 
     dInfo = ui_label(c, "Loading...", &lv_font_montserrat_14, COL_TEXT);
     lv_obj_set_pos(dInfo, PORTRAIT ? 100 : 152, 30);
@@ -106,6 +172,10 @@ static void detail_update() {
         }
         set_text(dInfo, buf);
     }
+#if KLIPPESP_THUMBNAILS
+    MrThumb nt;
+    if (mr_take_thumb(THUMB_DETAIL, &nt)) thumb_apply(detailThumb, nt, dImg, dImgBox);
+#endif
 }
 
 static void file_click(lv_event_t* e) {

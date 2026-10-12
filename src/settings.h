@@ -8,6 +8,7 @@ struct Settings {
     uint16_t port;      // Moonraker port, usually 7125 (or 80 behind nginx)
     char apikey[72];    // optional Moonraker API key
     uint16_t sleepMin;  // backlight off after N minutes idle, 0 = never
+    uint8_t uiMode;     // dashboard boards: 0 auto (touch UI if a touch panel answers), 1 dashboard, 2 touch UI
     uint8_t rotation;   // 0 landscape, 1 portrait, 2 landscape upside down, 3 portrait upside down
     uint8_t brightness; // backlight 10..255
     char ntp[64];       // NTP server

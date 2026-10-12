@@ -444,7 +444,7 @@ static void rot_cb(lv_event_t* e) {
     ui_confirm("Orientation", "Restart the display to apply the new orientation?", rot_yes);
 }
 
-static void bri_cb(lv_event_t* e) {
+[[maybe_unused]] static void bri_cb(lv_event_t* e) {
     lv_obj_t* s = lv_event_get_target(e);
     cfg.brightness = lv_slider_get_value(s);
     board_set_brightness(cfg.brightness);
@@ -493,6 +493,7 @@ void scr_system(lv_obj_t* p) {
     lv_obj_set_flex_flow(r, LV_FLEX_FLOW_ROW_WRAP);
     lv_obj_clear_flag(r, LV_OBJ_FLAG_SCROLLABLE);
 
+#if BOARD_HAS_DIMMING
     lv_obj_t* br = ui_row(r, rw, 32);
     ui_label(br, LV_SYMBOL_IMAGE, &lv_font_montserrat_14, COL_DIM);
     lv_obj_t* bs = lv_slider_create(br);
@@ -502,6 +503,7 @@ void scr_system(lv_obj_t* p) {
     lv_slider_set_value(bs, cfg.brightness, LV_ANIM_OFF);
     lv_obj_add_event_cb(bs, bri_cb, LV_EVENT_VALUE_CHANGED, nullptr);
     lv_obj_add_event_cb(bs, bri_cb, LV_EVENT_RELEASED, nullptr);
+#endif
 
     const lv_coord_t bw = P ? (rw - 4) / 2 : rw;
     auto act = [&](const char* t, lv_event_cb_t cb, void* ud, lv_color_t col) {

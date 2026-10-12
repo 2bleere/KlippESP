@@ -1,4 +1,6 @@
+// Board support: Wireless-Tag WT32-SC01 V3.3 (ST7796 SPI panel, FT6336U touch, PWM backlight), via LovyanGFX.
 #include "board.h"
+#if defined(BOARD_WT32_SC01)
 #include <Arduino.h>
 #define LGFX_USE_V1
 #include <LovyanGFX.hpp>
@@ -84,8 +86,8 @@ void board_set_brightness(uint8_t level) {
 }
 
 bool board_has_touch() { return true; }
+const uint16_t* board_framebuffer() { return nullptr; }  // the ST7796 holds the image
 
-void board_lcd_freeze() {}
 
 // ---------------- LVGL glue ----------------
 static void disp_flush(lv_disp_drv_t* drv, const lv_area_t* a, lv_color_t* px) {
@@ -138,3 +140,5 @@ void board_init(uint8_t rotation) {
 
     board_backlight(true);
 }
+
+#endif  // BOARD_WT32_SC01

@@ -27,7 +27,11 @@ struct Lock {
     ~Lock() { xSemaphoreGive(mtx); }
 };
 
-enum CmdType : uint8_t { C_GCODE, C_PRINT, C_FILES, C_META, C_POWER };
+enum CmdType : uint8_t { C_GCODE, C_PRINT, C_FILES, C_META, C_THUMB, C_POWER };
+
+#if KLIPPESP_THUMBNAILS
+static MrThumb thumbs[2];  // THUMB_DETAIL, THUMB_PRINT
+#endif
 
 struct Cmd {
     CmdType t;
@@ -569,6 +573,19 @@ static void pollTask(void*) {
             pollHost(tick);
         }
 
+#if KLIPPESP_THUMBNAILS
+        // fetch the thumbnail of the job being printed when it changes
+        {
+            static String lastFile;
+            String f;
+            { Lock l; f = S.file; }
+            if (f != lastFile) {
+                lastFile = f;
+                if (f.length()) enqueue(C_THUMB, f.c_str(), THUMB_PRINT);
+            }
+        }
+#endif
+
         tick++;
         uint32_t dt = millis() - t0;
         vTaskDelay(pdMS_TO_TICKS(dt < 1000 ? 1000 - dt : 50));
@@ -602,12 +619,69 @@ static void doFiles() {
     filesVer++;
 }
 
-static void doMeta(const char* file, bool storeMeta) {
+#if KLIPPESP_THUMBNAILS
+static void doThumb(const char* file, JsonArray thumbsArr, int slot) {
+    // pick the largest thumbnail no wider than 300 px (else the smallest)
+    JsonObject best, small;
+    int bestW = 0, smallW = 99999;
+    for (JsonObject t : thumbsArr) {
+        int w = t["width"] | 0;
+        if (w <= 300 && w > bestW) { best = t; bestW = w; }
+        if (w < smallW) { small = t; smallW = w; }
+    }
+    if (best.isNull()) best = small;
+    if (best.isNull()) return;
+    const char* rel = best["relative_path"] | "";
+    if (!rel[0]) return;
+
+    String dir = file;
+    int slash = dir.lastIndexOf('/');
+    dir = slash >= 0 ? dir.substring(0, slash + 1) : "";
+    String path = "/server/files/gcodes/" + urlEnc((dir + rel).c_str(), true);
+
+    WiFiClient wc;
+    HTTPClient h;
+    h.setConnectTimeout(3000);
+    h.setTimeout(6000);
+    if (!h.begin(wc, resolveHost(), cfg.port, path)) return;
+    if (cfg.apikey[0]) h.addHeader("X-Api-Key", cfg.apikey);
+    int code = h.GET();
+    int len = h.getSize();
+    if (code != 200 || len <= 24 || len > 400000) { h.end(); return; }
+    uint8_t* buf = (uint8_t*)ps_malloc(len);
+    if (!buf) { h.end(); return; }
+    WiFiClient* s = h.getStreamPtr();
+    int got = 0;
+    uint32_t t0 = millis();
+    while (got < len && millis() - t0 < 8000) {
+        int a = s->available();
+        if (a > 0) got += s->readBytes(buf + got, std::min(a, len - got));
+        else if (!s->connected()) break;
+        else delay(2);
+    }
+    h.end();
+    if (got != len || memcmp(buf + 1, "PNG", 3) != 0) { free(buf); return; }
+
+    Lock l;
+    if (thumbs[slot].data) free(thumbs[slot].data);
+    thumbs[slot].data = buf;
+    thumbs[slot].len = len;
+    thumbs[slot].w = (buf[18] << 8) | buf[19];
+    thumbs[slot].h = (buf[22] << 8) | buf[23];
+}
+#endif
+
+static void doMeta(const char* file, int slot, bool storeMeta) {
     JsonDocument filter;
     JsonObject fr = filter["result"].to<JsonObject>();
     for (const char* k : {"estimated_time", "filament_total", "filament_weight_total", "object_height", "layer_count",
                           "first_layer_extr_temp", "first_layer_bed_temp", "slicer"})
         fr[k] = true;
+#if KLIPPESP_THUMBNAILS
+    JsonObject ft = fr["thumbnails"].add<JsonObject>();
+    ft["width"] = true;
+    ft["relative_path"] = true;
+#endif
     JsonDocument d;
     int code = httpGetJson("/server/files/metadata?filename=" + urlEnc(file, false), d, &filter, 6000);
     if (code != 200) {
@@ -635,6 +709,11 @@ static void doMeta(const char* file, bool storeMeta) {
         strlcpy(meta.slicer, r["slicer"] | "", sizeof(meta.slicer));
         metaVer++;
     }
+#if KLIPPESP_THUMBNAILS
+    doThumb(file, r["thumbnails"], slot);
+#else
+    (void)slot;
+#endif
 }
 
 // After the printer is powered on, Klipper stays in shutdown/error until a firmware restart. Give the board time to
@@ -690,7 +769,8 @@ static void cmdTask(void*) {
                 if (cfg.powerRestart) powerOnRestart(c.a);
                 break;
             case C_FILES: doFiles(); break;
-            case C_META: doMeta(c.a, true); break;
+            case C_META: doMeta(c.a, c.slot, true); break;
+            case C_THUMB: doMeta(c.a, c.slot, false); break;
         }
     }
 }
@@ -755,7 +835,19 @@ void mr_post(const char* path) {
 void mr_print_file(const char* file) { enqueue(C_PRINT, file); }
 void mr_power_toggle(const char* device) { enqueue(C_POWER, device); }
 void mr_request_files() { enqueue(C_FILES, ""); }
+#if KLIPPESP_THUMBNAILS
+void mr_request_meta(const char* file) { enqueue(C_META, file, THUMB_DETAIL); }
+
+bool mr_take_thumb(int slot, MrThumb* out) {
+    Lock l;
+    if (!thumbs[slot].data) return false;
+    *out = thumbs[slot];
+    thumbs[slot].data = nullptr;
+    return true;
+}
+#else
 void mr_request_meta(const char* file) { enqueue(C_META, file); }
+#endif
 
 uint32_t mr_files_version(int* count) {
     Lock l;

@@ -2,6 +2,7 @@
 // tools/touch_about.py touches this file before each build so the build time is always current.
 #include "about.h"
 #include "version.h"
+#include "board.h"
 #include <Arduino.h>
 #include <WiFi.h>
 #include <lvgl.h>
@@ -12,11 +13,7 @@
 #include <esp_psram.h>
 #endif
 
-#if CONFIG_IDF_TARGET_ESP32S3
-static const char* BOARD = "Waveshare ESP32-S3-Touch-LCD-7";
-#else
-static const char* BOARD = "WT32-SC01 V3.3";
-#endif
+
 
 const char* about_build_time() {
     static char buf[24];
@@ -39,7 +36,7 @@ int about_collect(AboutItem* it, int max) {
     };
     add("Version", "v%s", FW_VERSION);
     add("Built", "%s", about_build_time());
-    add("Board", "%s", BOARD);
+    add("Board", "%s", BOARD_NAME);
     int rev = ESP.getChipRevision();  // IDF 5: major * 100 + minor
     add("Chip", "%s v%d.%d, %d cores, %lu MHz", ESP.getChipModel(), rev / 100, rev % 100, ESP.getChipCores(),
         (unsigned long)ESP.getCpuFreqMHz());

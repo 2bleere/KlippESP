@@ -95,6 +95,14 @@ void scr_connect(lv_obj_t* p);
 void scr_system(lv_obj_t* p);
 void scr_time(lv_obj_t* p);
 void scr_about(lv_obj_t* p);
+bool ui_dashboard_mode();  // Interface setting resolved for this board
+#if KLIPPESP_DASHBOARD
+void scr_dashboard(lv_obj_t* scr);
+#endif
+#if KLIPPESP_THUMBNAILS
+void ui_print_thumb(lv_obj_t* img, lv_coord_t box);  // show the running job's thumbnail in img
+bool ui_print_thumb_shown();                          // the running job has a thumbnail loaded
+#endif
 
 bool is_printing();  // printing or paused
 

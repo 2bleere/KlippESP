@@ -4,17 +4,27 @@
 #define LV_CONF_H
 
 #include <stdint.h>
+#include "klippesp_config.h"
 
 #define LV_COLOR_DEPTH 16
 #define LV_COLOR_16_SWAP 0
 
+#if KLIPPESP_PSRAM
+/* LVGL heap in PSRAM; internal RAM is kept for Wi-Fi / lwIP (see lv_psram.h) */
+#define LV_MEM_CUSTOM 1
+#define LV_MEM_CUSTOM_INCLUDE "lv_psram.h"
+#define LV_MEM_CUSTOM_ALLOC lv_psram_malloc
+#define LV_MEM_CUSTOM_FREE free
+#define LV_MEM_CUSTOM_REALLOC lv_psram_realloc
+#else
 /* LVGL's own memory pool, allocated once at lv_init(): keeps UI allocations from fragmenting the heap the
-   network stack needs (no PSRAM on the WT32-SC01) */
+   network stack needs (no PSRAM) */
 #define LV_MEM_CUSTOM 0
 #define LV_MEM_SIZE (36U * 1024U)  // worst screen ~22.5 KB (Home); long lists are virtual (ui_vlist)
 #define LV_MEM_ADR 0
 #define LV_MEM_POOL_INCLUDE <stdlib.h>
 #define LV_MEM_POOL_ALLOC malloc
+#endif
 
 #define LV_TICK_CUSTOM 1
 #define LV_TICK_CUSTOM_INCLUDE "Arduino.h"
@@ -30,17 +40,22 @@
 #define LV_USE_PERF_MONITOR 0
 #define LV_USE_MEM_MONITOR 0
 
-#define LV_IMG_CACHE_DEF_SIZE 1
+#define LV_IMG_CACHE_DEF_SIZE (KLIPPESP_THUMBNAILS ? 2 : 1)
 
-/* sized for the 480x320 screen */
+/* touch UI fonts; the dashboard adds larger ones */
 #define LV_FONT_MONTSERRAT_12 1
 #define LV_FONT_MONTSERRAT_14 1
 #define LV_FONT_MONTSERRAT_16 1
 #define LV_FONT_MONTSERRAT_20 1
 #define LV_FONT_MONTSERRAT_28 1
+#if KLIPPESP_LARGE_FONTS
+#define LV_FONT_MONTSERRAT_24 1
+#define LV_FONT_MONTSERRAT_32 1
+#define LV_FONT_MONTSERRAT_48 1
+#endif
 #define LV_FONT_DEFAULT &lv_font_montserrat_16
 
-#define LV_USE_PNG 0          /* no print thumbnails on this board (no PSRAM) */
+#define LV_USE_PNG KLIPPESP_THUMBNAILS  /* slicer thumbnails (PSRAM boards) */
 
 #define LV_BUILD_EXAMPLES 0
 

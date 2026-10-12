@@ -19,6 +19,10 @@ static void ui_screen_size() {
 void ui_icons_init() {
     icons_20.fallback = &lv_font_montserrat_20;
     icons_28.fallback = &lv_font_montserrat_28;
+#if KLIPPESP_DASHBOARD
+    void dashboard_icons_init();
+    dashboard_icons_init();
+#endif
 }
 
 static lv_obj_t* content;
@@ -619,6 +623,8 @@ static void update_sleep() {
 
 uint32_t ui_lvgl_peak;  // highest LVGL pool use seen (bytes), for sizing LV_MEM_SIZE
 
+static bool dashMode = false;  // read-only status dashboard instead of the touch UI
+
 static void tick_cb(lv_timer_t*) {
     lv_mem_monitor_t mm;
     lv_mem_monitor(&mm);
@@ -628,6 +634,10 @@ static void tick_cb(lv_timer_t*) {
     static bool first = true;
 
     mr_get(&g);
+    if (dashMode) {
+        if (upd) upd();
+        return;
+    }
     update_topbar();
 
     if (first) {
@@ -673,16 +683,44 @@ void ui_boot_logo() {
     lv_refr_now(nullptr);
 }
 
+// Touch UI on a panel without touch (Interface: Touch UI): nobody can tap through it, so show each screen in turn.
+static void preview_cb(lv_timer_t*) {
+    static const Scr order[] = {S_HOME, S_PRINTING, S_FILES, S_TEMP, S_MOVE, S_EXTRUDE, S_FANS, S_MACROS,
+                                S_CONSOLE, S_POWER, S_SETTINGS, S_SYSTEM, S_ZOFFSET, S_TIME, S_CONNECT, S_ABOUT};
+    static int i = 0;
+    i = (i + 1) % (int)(sizeof(order) / sizeof(order[0]));
+    ui_goto(order[i]);
+}
+
+bool ui_dashboard_mode() {
+#if KLIPPESP_DASHBOARD
+    return cfg.uiMode == 1 || (cfg.uiMode == 0 && !board_has_touch());
+#else
+    return false;
+#endif
+}
+
 void ui_init() {
     lv_obj_clean(lv_scr_act());  // remove the boot logo
     ui_icons_init();
+    dashMode = ui_dashboard_mode();
     lv_disp_t* disp = lv_disp_get_default();
-    lv_theme_t* th = lv_theme_default_init(disp, COL_ACCENT, COL_RED, true, &lv_font_montserrat_16);
+    lv_theme_t* th = lv_theme_default_init(disp, COL_ACCENT, COL_RED, true,
+                                           dashMode ? &lv_font_montserrat_20 : &lv_font_montserrat_16);
     lv_disp_set_theme(disp, th);
 
     lv_obj_t* scr = lv_scr_act();
     lv_obj_set_style_bg_color(scr, COL_BG, 0);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
+
+#if KLIPPESP_DASHBOARD
+    if (dashMode) {
+        mr_get(&g);
+        scr_dashboard(scr);
+        lv_timer_create(tick_cb, 500, nullptr);
+        return;
+    }
+#endif
 
     build_topbar(scr);
 
@@ -699,4 +737,5 @@ void ui_init() {
     build(S_HOME);
 
     lv_timer_create(tick_cb, 500, nullptr);
+    if (!board_has_touch()) lv_timer_create(preview_cb, 8000, nullptr);
 }

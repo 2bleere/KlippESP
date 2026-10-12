@@ -10,6 +10,7 @@
 #include "about.h"
 #include <WiFi.h>
 #include <WebServer.h>
+#include <algorithm>
 #include <DNSServer.h>
 #include <Update.h>
 #include <ArduinoOTA.h>
@@ -162,12 +163,22 @@ static void handle_root() {
     h += "<label>Printer IP or hostname</label><input name=host value=\"" + esc(cfg.host) + "\" placeholder='192.168.1.50'>";
     h += "<label>Moonraker port</label><input name=port type=number value=\"" + String(cfg.port) + "\">";
     h += F("<label>API key (optional)</label><input name=apikey type=password placeholder='(unchanged)'>");
+#if KLIPPESP_DASHBOARD
+    h += F("<label>Interface</label><select name=ui>");
+    static const char* uis[] = {"Auto (touch UI when a touch panel is found)", "Status dashboard",
+                                "Touch UI (without touch: shows each screen in turn)"};
+    for (int i = 0; i < 3; i++)
+        h += "<option value=" + String(i) + (cfg.uiMode == i ? " selected>" : ">") + uis[i] + "</option>";
+    h += F("</select><small>Changing it restarts the display.</small>");
+#endif
     h += F("<label>Display orientation</label><select name=rot>");
     static const char* rots[] = {"Landscape", "Portrait", "Landscape (upside down)", "Portrait (upside down)"};
     for (int i = 0; i < 4; i++)
         h += "<option value=" + String(i) + (cfg.rotation == i ? " selected>" : ">") + rots[i] + "</option>";
     h += F("</select><small>Changing it restarts the display.</small>");
+#if BOARD_HAS_DIMMING
     h += "<label>Brightness</label><input type=range name=bri min=10 max=255 value=" + String(cfg.brightness) + ">";
+#endif
     h += F("<label>Screen off after</label><select name=sleep>");
     static const uint16_t sleeps[] = {0, 1, 5, 15, 30, 60};  // same choices as the System screen
     for (uint16_t m : sleeps)
@@ -197,7 +208,7 @@ static void handle_root() {
            "<h3 style='margin-top:32px'>Firmware update</h3><form method=post action=/update enctype=multipart/form-data "
            "onsubmit=\"this.querySelector('button').textContent='Uploading\u2026 (about 30 s)';\">"
            "<input type=file name=fw accept=.bin required><button style='background:#2f81f7'>Upload &amp; install</button>"
-           "<small>Use .pio/build/wt32_sc01/firmware.bin. Settings are kept.</small></form>");
+           "<small>Use .pio/build/" BOARD_ENV "/firmware.bin. Settings are kept.</small></form>");
     // About: same facts as the display's About screen
     h += F("<details style='margin-top:28px'><summary style='cursor:pointer;color:#8b949e'>About KlippESP v" FW_VERSION
            "</summary><table style='width:100%;margin-top:8px;font-size:14px;border-collapse:collapse'>");
@@ -268,12 +279,19 @@ static void handle_save() {
         rotChanged = r != cfg.rotation;
         cfg.rotation = r;
     }
+#if KLIPPESP_DASHBOARD
+    if (server.hasArg("ui")) {  // the interface is chosen at boot, like the orientation
+        uint8_t u = server.arg("ui").toInt() % 3;
+        rotChanged |= u != cfg.uiMode;
+        cfg.uiMode = u;
+    }
+#endif
     settings_save();
     mr_reconfigure();
     server.send(200, "text/html",
                 "<!doctype html><meta name=viewport content='width=device-width'><body style='font-family:sans-serif;"
                 "background:#0d1117;color:#e6edf3;padding:24px'><h3>Saved.</h3><p>" +
-                    (rotChanged ? String("The display is restarting with the new orientation. ")
+                    (rotChanged ? String("The display is restarting with the new layout. ")
                                 : String("")) +
                     (apActive || wifiChanged
                          ? "The display is connecting to <b>" + esc(cfg.ssid) + "</b>. The setup hotspot turns off once "
@@ -306,6 +324,7 @@ static void serial_cmd(String line) {
     else if (k == "port") cfg.port = v.toInt() > 0 ? v.toInt() : 7125;
     else if (k == "apikey") strlcpy(cfg.apikey, v.c_str(), sizeof(cfg.apikey));
     else if (k == "rotate") cfg.rotation = v.toInt() & 3;  // takes effect after save + restart
+    else if (k == "ui") cfg.uiMode = v.toInt() % 3;        // dashboard boards: 0 auto, 1 dashboard, 2 touch UI
     else if (k == "bri") board_set_brightness(cfg.brightness = constrain(v.toInt(), 10, 255));
     else if (k == "pwrrestart") cfg.powerRestart = v.toInt() != 0;
     else if (k == "sleep") cfg.sleepMin = constrain(v.toInt(), 0, 1440);  // minutes, 0 = never
@@ -323,7 +342,7 @@ static void serial_cmd(String line) {
         log_status("status");
         return;
     } else if (k != "show") {
-        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 bri=10..255 sleep=min pwrrestart=0|1 ntp= tz= clock24=0|1 save show status");
+        Serial.println("ERR keys: ssid= pass= host= port= apikey= rotate=0..3 ui=0..2 bri=10..255 sleep=min pwrrestart=0|1 ntp= tz= clock24=0|1 save show status");
         return;
     }
     Serial.printf("OK ssid='%s' pass=%s host='%s' port=%u apikey=%s wifi=%s ip=%s\n", cfg.ssid,
@@ -399,6 +418,38 @@ void net_begin() {
                  (unsigned)m.total_size, (unsigned)ui_lvgl_peak, (unsigned)(m.total_size - m.free_size), (unsigned)m.used_pct, (unsigned)m.frag_pct,
                  (unsigned)sp, (unsigned)sc, (unsigned)uxTaskGetStackHighWaterMark(nullptr));
         server.send(200, "application/json", b);
+    });
+    server.on("/screenshot.bmp", HTTP_GET, [] {  // what the panel shows right now (boards with a frame buffer)
+        const uint16_t* fb = board_framebuffer();
+        if (!fb) {
+            server.send(404, "text/plain", "This display keeps the image in the panel; no screenshot available.");
+            return;
+        }
+        const uint32_t w = LCD_LONG, h = LCD_SHORT, row = w * 2, data = row * h, off = 14 + 40 + 12;
+        uint8_t hdr[off] = {'B', 'M'};
+        auto put32 = [&](int at, uint32_t v) { memcpy(hdr + at, &v, 4); };
+        put32(2, off + data);
+        put32(10, off);
+        put32(14, 40);                    // BITMAPINFOHEADER
+        put32(18, w);
+        put32(22, (uint32_t)-(int32_t)h);  // top-down rows
+        hdr[26] = 1;                      // planes
+        hdr[28] = 16;                     // bits per pixel
+        put32(30, 3);                     // BI_BITFIELDS: RGB565 masks follow
+        put32(34, data);
+        put32(54, 0xF800);
+        put32(58, 0x07E0);
+        put32(62, 0x001F);
+        server.setContentLength(off + data);
+        server.send(200, "image/bmp", "");
+        server.sendContent((const char*)hdr, off);
+        uint8_t* buf = (uint8_t*)malloc(row * 8);  // 8 rows at a time, only while sending
+        for (uint32_t y = 0; buf && y < h; y += 8) {
+            uint32_t n = std::min<uint32_t>(8, h - y) * row;
+            memcpy(buf, (const uint8_t*)fb + y * row, n);
+            server.sendContent((const char*)buf, n);
+        }
+        free(buf);
     });
     server.on("/favicon.ico", HTTP_GET, [] { server.send_P(200, "image/png", (PGM_P)WEB_LOGO_PNG, WEB_LOGO_PNG_LEN); });
     server.on("/logo.png", HTTP_GET, [] {

@@ -1,4 +1,5 @@
 #pragma once
+#include "klippesp_config.h"  // KLIPPESP_THUMBNAILS
 // Moonraker HTTP client. Runs in background FreeRTOS tasks; the UI reads snapshots
 // with mr_get() and sends requests that are queued (never blocking the UI thread).
 #include <Arduino.h>
@@ -126,9 +127,20 @@ void mr_power_toggle(const char* device);
 // data requests (asynchronous)
 void mr_request_files();
 // File list lives in the Moonraker module only; the UI reads the entries it shows (no per-tick list copies).
+#if KLIPPESP_THUMBNAILS
+// Slicer thumbnail PNG bytes (PSRAM boards only). Ownership moves to the caller on mr_take_thumb() (release with free()).
+struct MrThumb {
+    uint8_t* data;
+    size_t len;
+    uint16_t w, h;
+};
+enum { THUMB_DETAIL = 0, THUMB_PRINT = 1 };
+bool mr_take_thumb(int slot, MrThumb* out);
+#endif
+
 uint32_t mr_files_version(int* count);  // changes whenever the list is replaced
 bool mr_file(int i, MrFile* out);       // newest first
-void mr_request_meta(const char* file);
+void mr_request_meta(const char* file);  // with thumbnails: also fetches the detail thumbnail
 uint32_t mr_meta(MrMeta* out);
 
 void mr_pause(bool on);  // stop all network activity (used during firmware updates)

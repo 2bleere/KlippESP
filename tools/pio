@@ -1,0 +1,28 @@
+#!/bin/sh
+# PlatformIO with one core directory per board, so switching boards never forces a core-library rebuild.
+# The Waveshare environment recompiles the shared Arduino core libraries with custom ESP-IDF options
+# (custom_sdkconfig); a build for another board in the same directory reinstalls them.
+#
+#   tools/pio run -e wt32_sc01 -t upload
+#   tools/pio run                      (no -e: builds every default environment, each in its own directory)
+#
+# Directories: ~/.platformio (Waveshare / default), ~/.platformio-wt32 (WT32-SC01).
+
+core_dir_for() {
+    case "$1" in
+        wt32*) echo "$HOME/.platformio-wt32" ;;
+        *) echo "$HOME/.platformio" ;;
+    esac
+}
+
+env=$(printf '%s\n' "$@" | awk 'p { print; exit } $0 == "-e" || $0 == "--environment" { p = 1 } /^(-e|--environment)=/ { sub(/^[^=]*=/, ""); print; exit }')
+
+if [ -z "$env" ] && [ "$1" = "run" ]; then  # one run per default environment
+    cd "$(dirname "$0")/.." || exit 1
+    for e in $(sed -n 's/^default_envs *= *//p' platformio.ini | tr ',' ' '); do
+        PLATFORMIO_CORE_DIR=$(core_dir_for "$e") pio "$@" -e "$e" || exit $?
+    done
+    exit 0
+fi
+
+PLATFORMIO_CORE_DIR=$(core_dir_for "$env") exec pio "$@"

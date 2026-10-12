@@ -4,6 +4,7 @@
 #include <lvgl.h>
 
 extern lv_font_t icons_20, icons_28;
+extern lv_font_t icons_16, icons_72;  // dashboard boards only (KLIPPESP_LARGE_FONTS)
 extern const lv_font_t icons_56;
 void ui_icons_init();
 
